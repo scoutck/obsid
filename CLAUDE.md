@@ -15,6 +15,7 @@ npx tsc --noEmit     # Type check without emitting
 npm run lint         # ESLint
 npx prisma migrate dev --name <name>  # Create migration
 npx tsx prisma/fts-setup.ts           # Set up FTS5 virtual table + triggers
+npx tsx prisma/migrate-commands.ts    # Migrate /claude commands from note content to Command table
 ```
 
 ## Architecture
@@ -31,6 +32,8 @@ This project uses Prisma 7 which requires a driver adapter. `src/lib/db.ts` crea
 
 Tags and links are stored as JSON strings in SQLite (`"[]"`), parsed in `src/types/index.ts` via `parseNote()` / `parseCollection()`. All lib functions return parsed types, not raw DB rows.
 
+The `Command` table stores `/claude` command history (instruction, confirmation, status, line number). `src/lib/commands.ts` has CRUD. No Prisma `@relation` directives are used in this project — cascade deletes are handled manually in API routes (e.g., `deleteCommandsForNote` before `deleteNote`).
+
 ### Full-text search
 
 `prisma/fts-setup.ts` creates a virtual FTS5 table (`notes_fts`) with triggers to keep it synced with the `Note` table. Search in `src/lib/notes.ts` tries FTS first, falls back to LIKE queries (needed for test environment where FTS table may not exist).
@@ -42,7 +45,8 @@ Custom extensions live in `src/editor/`:
 - `slash-commands.ts` — Command definitions with `action` namespace (`format:*`, `note:*`, `org:*`, `ai:*`) and filtering logic.
 - `formatting.ts` — Pure functions for text wrapping/insertion. `applyFormatting` is testable without DOM, `executeFormatting` dispatches CodeMirror transactions.
 - `wiki-links.ts` — Regex-based `[[link]]` decoration and `extractWikiLinks()` for saving link references.
-- `tag-syntax.ts` — `#tag` highlighting (ViewPlugin) + `/claude` and `✓`/`✗` line styling. Skips code blocks, headings, inline code.
+- `tag-syntax.ts` — `#tag` highlighting (ViewPlugin). Skips code blocks, headings, inline code.
+- `command-widgets.ts` — StateField + widget decorations for `/claude` commands stored in the Command table. Uses `addCommandEffect`/`updateCommandEffect` and `mapPos` for position tracking through edits.
 
 The Editor also owns a `TagMenu` autocomplete dropdown (triggered by `#`) alongside the `SlashMenu`.
 
@@ -54,9 +58,9 @@ The Editor detects `/` via an `updateListener`, positions the `SlashMenu` compon
 
 ### AI organize system
 
-`src/app/api/ai/organize/route.ts` — single Sonnet prompt with vault context (top tags, note titles, recent siblings, people list). Called on note close (fire-and-forget) and via `/organize` slash command. Appends `#tags` and `[[links]]` to note content, creates/links people.
+`src/app/api/ai/organize/route.ts` — single Sonnet prompt with vault context (top tags, 100 recent note titles, recent siblings, people list). Called on note close (2s debounced, fire-and-forget) and via `/organize` slash command. Fetches note server-side, snapshots `updatedAt`, uses atomic conditional update to discard results if note changed during AI processing. Appends `#tags` and `[[links]]` to note content, creates/links people.
 
-`src/app/api/ai/command/route.ts` — `/claude` inline commands. Tool-use loop like Ask Claude. Returns short confirmation text.
+`src/app/api/ai/command/route.ts` — `/claude` inline commands. Tool-use loop like Ask Claude. Stores command + confirmation in the `Command` table (not in note content). `GET /api/notes/[id]/commands` fetches commands for a note.
 
 ### Person system
 
@@ -82,4 +86,5 @@ Vitest with `fileParallelism: false` (SQLite concurrency). `tests/setup.ts` crea
 - **FTS5 blocks `prisma migrate dev`.** The virtual table causes persistent drift detection. Create migration SQL manually, apply with `prisma migrate deploy`, then `prisma generate`.
 - **`prisma generate` after schema changes.** The dev server uses the generated client — if you add models/fields and only run migrate, the runtime client is stale. Always run `npx prisma generate` after migrations.
 - **Client/server import boundary for pure functions.** `extractInlineTags` lives in `src/lib/extract-tags.ts` (no Prisma import) so `page.tsx` can use it. `src/lib/tags.ts` re-exports it for server use. Don't import `src/lib/tags.ts` from client components — it pulls in Prisma.
-- **`/claude` Enter key must insert a newline.** The custom Enter keymap fires the command AND inserts `\n` + moves cursor so the user can keep typing. Without this, Enter is swallowed and the user is stuck on the `/claude` line.
+- **`/claude` Enter key removes the line from content.** The custom Enter keymap detects `/claude <instruction>`, deletes the line, stores a Command in the DB, and adds a widget decoration via `addCommandEffect`. The command text never persists in note content.
+- **Use ISO strings for raw SQL timestamps, not `CURRENT_TIMESTAMP`.** Prisma writes `@updatedAt` as ISO strings (`2026-04-05T22:00:00.123Z`). SQLite's `CURRENT_TIMESTAMP` produces `2026-04-05 22:00:00` (no millis, space separator). Mixing formats breaks conditional updates. Use `new Date().toISOString()` in parameterized queries.
