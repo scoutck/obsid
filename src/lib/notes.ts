@@ -64,6 +64,7 @@ export async function listNotes(): Promise<Note[]> {
       tags: string;
       type: string;
       links: string;
+      unresolvedPeople: string;
       createdAt: string;
       updatedAt: string;
     }>
@@ -102,6 +103,7 @@ export async function searchNotes(query: string): Promise<Note[]> {
         tags: string;
         type: string;
         links: string;
+        unresolvedPeople: string;
         createdAt: string;
         updatedAt: string;
       }>

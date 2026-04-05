@@ -6,13 +6,7 @@ import * as url from "url";
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 const testDb = path.join(root, "prisma", "test.db");
-const migrationSql = path.join(
-  root,
-  "prisma",
-  "migrations",
-  "20260405184246_init",
-  "migration.sql"
-);
+const migrationsDir = path.join(root, "prisma", "migrations");
 
 export async function setup() {
   // Remove stale test db to start fresh each run
@@ -20,17 +14,23 @@ export async function setup() {
     fs.unlinkSync(testDb);
   }
 
-  const sql = fs.readFileSync(migrationSql, "utf-8");
   const client = createClient({ url: `file:${testDb}` });
 
-  // Execute each statement separately
-  const statements = sql
-    .split(";")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+  // Read all migration directories, sort them, and apply each in order
+  const entries = fs.readdirSync(migrationsDir).sort();
+  for (const entry of entries) {
+    const migrationSql = path.join(migrationsDir, entry, "migration.sql");
+    if (!fs.existsSync(migrationSql)) continue;
 
-  for (const stmt of statements) {
-    await client.execute(stmt);
+    const sql = fs.readFileSync(migrationSql, "utf-8");
+    const statements = sql
+      .split(";")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    for (const stmt of statements) {
+      await client.execute(stmt);
+    }
   }
 
   client.close();

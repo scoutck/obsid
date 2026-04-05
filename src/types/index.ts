@@ -5,8 +5,23 @@ export interface Note {
   tags: string[];
   type: string;
   links: string[];
+  unresolvedPeople: string[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface PersonMeta {
+  id: string;
+  noteId: string;
+  aliases: string[];
+  role: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface NotePerson {
+  noteId: string;
+  personNoteId: string;
 }
 
 export interface Collection {
@@ -30,6 +45,7 @@ export function parseNote(raw: {
   tags: string;
   type: string;
   links: string;
+  unresolvedPeople: string;
   createdAt: Date;
   updatedAt: Date;
 }): Note {
@@ -37,6 +53,21 @@ export function parseNote(raw: {
     ...raw,
     tags: JSON.parse(raw.tags),
     links: JSON.parse(raw.links),
+    unresolvedPeople: JSON.parse(raw.unresolvedPeople),
+  };
+}
+
+export function parsePersonMeta(raw: {
+  id: string;
+  noteId: string;
+  aliases: string;
+  role: string;
+  createdAt: Date;
+  updatedAt: Date;
+}): PersonMeta {
+  return {
+    ...raw,
+    aliases: JSON.parse(raw.aliases),
   };
 }
 
