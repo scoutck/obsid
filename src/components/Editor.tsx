@@ -65,9 +65,10 @@ interface EditorProps {
   onChange?: (content: string) => void;
   onSlashCommand?: (command: SlashCommand, view: EditorView) => void;
   onWikiLinkClick?: (title: string) => void;
+  editorViewRef?: React.MutableRefObject<EditorView | null>;
 }
 
-export default function Editor({ initialContent = "", onChange, onSlashCommand, onWikiLinkClick }: EditorProps) {
+export default function Editor({ initialContent = "", onChange, onSlashCommand, onWikiLinkClick, editorViewRef }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 
@@ -183,8 +184,10 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
     });
 
     viewRef.current = view;
+    if (editorViewRef) editorViewRef.current = view;
 
     return () => {
+      if (editorViewRef) editorViewRef.current = null;
       view.destroy();
     };
   }, [initialContent]);

@@ -5,6 +5,8 @@ import Editor from "@/components/Editor";
 import NoteSearchModal from "@/components/NoteSearchModal";
 import TagInput from "@/components/TagInput";
 import CollectionModal from "@/components/CollectionModal";
+import AiPrompt from "@/components/AiPrompt";
+import AiResponseBlock from "@/components/AiResponseBlock";
 import { executeFormatting } from "@/editor/formatting";
 import { extractWikiLinks } from "@/editor/wiki-links";
 import type { SlashCommand } from "@/editor/slash-commands";
@@ -19,6 +21,13 @@ export default function Home() {
   const [showTagInput, setShowTagInput] = useState(false);
   const [tagInputPosition, setTagInputPosition] = useState({ top: 0, left: 0 });
   const [collectionModal, setCollectionModal] = useState<"open" | "new" | null>(null);
+  const [showAiPrompt, setShowAiPrompt] = useState(false);
+  const [aiResponse, setAiResponse] = useState<{
+    prompt: string;
+    response: string;
+    isLoading: boolean;
+  } | null>(null);
+  const editorViewRef = useRef<EditorView | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Create a new note on first load
@@ -155,6 +164,11 @@ export default function Home() {
         return;
       }
 
+      if (command.action === "ai:ask") {
+        setShowAiPrompt(true);
+        return;
+      }
+
       console.log("Unhandled command:", command.action);
     },
     [loadNote]
@@ -200,6 +214,41 @@ export default function Home() {
     [noteId]
   );
 
+  const handleAiSubmit = useCallback(
+    async (prompt: string) => {
+      setShowAiPrompt(false);
+      setAiResponse({ prompt, response: "", isLoading: true });
+
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, currentNoteContent: content }),
+      });
+
+      const text = await res.text();
+      setAiResponse({ prompt, response: text, isLoading: false });
+    },
+    [content]
+  );
+
+  const handleAiKeep = useCallback(
+    (text: string) => {
+      const view = editorViewRef.current;
+      if (view) {
+        const pos = view.state.doc.length;
+        view.dispatch({
+          changes: { from: pos, insert: "\n\n" + text },
+        });
+      }
+      setAiResponse(null);
+    },
+    []
+  );
+
+  const handleAiDismiss = useCallback(() => {
+    setAiResponse(null);
+  }, []);
+
   if (!noteId) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -209,14 +258,33 @@ export default function Home() {
   }
 
   return (
-    <main className="h-screen w-screen">
-      <Editor
-        key={noteId}
-        initialContent={content}
-        onChange={handleChange}
-        onSlashCommand={handleSlashCommand}
-        onWikiLinkClick={handleWikiLinkClick}
-      />
+    <main className="h-screen w-screen flex flex-col">
+      <div className="flex-1 overflow-hidden">
+        <Editor
+          key={noteId}
+          initialContent={content}
+          onChange={handleChange}
+          onSlashCommand={handleSlashCommand}
+          onWikiLinkClick={handleWikiLinkClick}
+          editorViewRef={editorViewRef}
+        />
+      </div>
+
+      <div className="max-w-[720px] mx-auto w-full px-4">
+        {showAiPrompt && (
+          <AiPrompt onSubmit={handleAiSubmit} onClose={() => setShowAiPrompt(false)} />
+        )}
+        {aiResponse && (
+          <AiResponseBlock
+            prompt={aiResponse.prompt}
+            response={aiResponse.response}
+            isLoading={aiResponse.isLoading}
+            onKeep={handleAiKeep}
+            onDismiss={handleAiDismiss}
+          />
+        )}
+      </div>
+
       {showNoteSearch && (
         <NoteSearchModal
           onSelect={(note) => {
