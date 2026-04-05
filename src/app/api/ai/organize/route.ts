@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { getNote, updateNote, getRecentNotes, listNotes } from "@/lib/notes";
+import { updateNote, getRecentNotes, listNotes } from "@/lib/notes";
 import { getTagVocabulary, extractInlineTags } from "@/lib/tags";
 import {
   listPeople,
@@ -118,19 +118,17 @@ Return JSON in this exact format:
     return Response.json({ error: "Failed to parse AI response" }, { status: 500 });
   }
 
-  // Process the result
-  const note = await getNote(noteId);
-  if (!note) {
-    return Response.json({ error: "Note not found" }, { status: 404 });
-  }
-
-  let updatedContent = note.content;
+  // Use the original content from the request (not a re-fetch) to avoid
+  // race conditions with auto-save modifying the note while AI was processing.
+  let updatedContent = content;
 
   // Apply tag corrections in content
   if (result.tagCorrections) {
     for (const correction of result.tagCorrections) {
+      // Escape regex special chars — correction.from comes from AI output
+      const escaped = correction.from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       updatedContent = updatedContent.replace(
-        new RegExp(`#${correction.from}(?=\\s|$)`, "g"),
+        new RegExp(`#${escaped}(?=\\s|$)`, "g"),
         `#${correction.to}`
       );
     }
