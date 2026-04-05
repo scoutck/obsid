@@ -9,6 +9,7 @@ import AiPrompt from "@/components/AiPrompt";
 import AiResponseBlock from "@/components/AiResponseBlock";
 import { executeFormatting } from "@/editor/formatting";
 import { extractWikiLinks } from "@/editor/wiki-links";
+import { extractInlineTags } from "@/lib/extract-tags";
 import type { SlashCommand } from "@/editor/slash-commands";
 import type { EditorView } from "@codemirror/view";
 import type { Note } from "@/types";
@@ -222,11 +223,12 @@ export default function Home() {
           : newContent.split("\n")[0]?.slice(0, 100) || "";
 
         const links = extractWikiLinks(newContent);
+        const tags = extractInlineTags(newContent);
 
         await fetch(`/api/notes/${noteId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, content: newContent, links }),
+          body: JSON.stringify({ title, content: newContent, links, tags }),
         });
       }, 500);
     },

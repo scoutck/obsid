@@ -122,3 +122,13 @@ export async function searchNotes(query: string): Promise<Note[]> {
     );
   }
 }
+
+export async function getRecentNotes(
+  ids: string[]
+): Promise<Note[]> {
+  if (ids.length === 0) return [];
+  const raw = await prisma.note.findMany({
+    where: { id: { in: ids } },
+  });
+  return raw.map(parseNote);
+}
