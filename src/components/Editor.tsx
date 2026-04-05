@@ -186,9 +186,15 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
               const match = line.text.match(/^\/claude\s+(.+)$/);
               if (match) {
                 onClaudeCommandRef.current?.(match[1], line.from);
-                return true; // Prevent default Enter (new line)
+                // Insert newline and move cursor to next line so user can keep typing
+                const insertPos = line.to;
+                view.dispatch({
+                  changes: { from: insertPos, insert: "\n" },
+                  selection: { anchor: insertPos + 1 },
+                });
+                return true;
               }
-              return false; // Let default Enter happen
+              return false;
             },
           },
         ]),

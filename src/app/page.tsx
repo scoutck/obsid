@@ -72,22 +72,27 @@ export default function Home() {
 
   const organizeNote = useCallback(
     async (id: string) => {
-      const res = await fetch(`/api/notes/${id}`);
-      const note = await res.json();
+      try {
+        const res = await fetch(`/api/notes/${id}`);
+        if (!res.ok) return null;
+        const note = await res.json();
 
-      const organizeRes = await fetch("/api/ai/organize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          noteId: id,
-          title: note.title,
-          content: note.content,
-          recentSiblingIds: recentSiblingsRef.current.filter((sid) => sid !== id),
-        }),
-      });
+        const organizeRes = await fetch("/api/ai/organize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            noteId: id,
+            title: note.title,
+            content: note.content,
+            recentSiblingIds: recentSiblingsRef.current.filter((sid) => sid !== id),
+          }),
+        });
 
-      if (!organizeRes.ok) return null;
-      return organizeRes.json();
+        if (!organizeRes.ok) return null;
+        return organizeRes.json();
+      } catch {
+        return null;
+      }
     },
     []
   );
