@@ -32,9 +32,9 @@ function extractCommands(content: string): {
     const trimmed = lines[i].trimStart();
 
     if (trimmed.startsWith("/claude ")) {
-      // Start a new command
+      // Start a new command — line number is position in cleaned output
       currentCommand = {
-        line: i + 1, // 1-based
+        line: cleanedLines.length + 1, // 1-based, relative to cleaned content
         instruction: trimmed.replace(/^\/claude\s+/, ""),
         confirmation: "",
         status: "done",
