@@ -121,6 +121,43 @@ export async function listNotes(): Promise<Note[]> {
   );
 }
 
+/**
+ * Fetch the most recent notes for organize context, filtered at the SQL level.
+ * Excludes the given note and any person notes (by noteId set).
+ */
+export async function listContextNotes(
+  excludeNoteId: string,
+  personNoteIds: string[],
+  limit: number = 100
+): Promise<Note[]> {
+  const excludeIds = [excludeNoteId, ...personNoteIds];
+  const placeholders = excludeIds.map(() => "?").join(", ");
+  const raw = await prisma.$queryRawUnsafe<
+    Array<{
+      id: string;
+      title: string;
+      content: string;
+      tags: string;
+      type: string;
+      links: string;
+      unresolvedPeople: string;
+      createdAt: string;
+      updatedAt: string;
+    }>
+  >(
+    `SELECT * FROM "Note" WHERE id NOT IN (${placeholders}) ORDER BY updatedAt DESC, rowid DESC LIMIT ?`,
+    ...excludeIds,
+    limit
+  );
+  return raw.map((r) =>
+    parseNote({
+      ...r,
+      createdAt: new Date(r.createdAt),
+      updatedAt: new Date(r.updatedAt),
+    })
+  );
+}
+
 export async function searchNotes(query: string): Promise<Note[]> {
   try {
     const results = await prisma.$queryRawUnsafe<Array<{ id: string }>>(

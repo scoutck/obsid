@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { getNote, conditionalUpdateNote, getRecentNotes, listNotes } from "@/lib/notes";
+import { getNote, conditionalUpdateNote, getRecentNotes, listContextNotes } from "@/lib/notes";
 import { getTagVocabulary, extractInlineTags } from "@/lib/tags";
 import {
   listPeople,
@@ -32,9 +32,8 @@ export async function POST(request: NextRequest) {
   const { title, content } = note;
 
   // Gather vault context
-  const [tagVocab, allNotes, recentSiblings, people] = await Promise.all([
+  const [tagVocab, recentSiblings, people] = await Promise.all([
     getTagVocabulary(),
-    listNotes(),
     getRecentNotes(recentSiblingIds ?? []),
     listPeople(),
   ]);
@@ -43,11 +42,9 @@ export async function POST(request: NextRequest) {
   const existingLinks = extractWikiLinks(content);
 
   // Context: 100 most recently edited notes, excluding this note and person notes.
-  // listNotes() already returns ordered by updatedAt DESC.
-  const personNoteIds = new Set(people.map((p) => p.meta.noteId));
-  const contextNotes = allNotes
-    .filter((n) => n.id !== noteId && !personNoteIds.has(n.id))
-    .slice(0, 100);
+  // Filtered and limited at SQL level for efficiency.
+  const personNoteIds = people.map((p) => p.meta.noteId);
+  const contextNotes = await listContextNotes(noteId, personNoteIds);
 
   const noteTitles = contextNotes
     .map((n) => `- ${n.title || "Untitled"}: ${n.content.slice(0, 100)}`)
