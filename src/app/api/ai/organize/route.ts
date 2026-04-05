@@ -42,8 +42,14 @@ export async function POST(request: NextRequest) {
   const existingTags = extractInlineTags(content);
   const existingLinks = extractWikiLinks(content);
 
-  const noteTitles = allNotes
-    .slice(0, 100)
+  // Context: 100 most recently edited notes, excluding this note and person notes.
+  // listNotes() already returns ordered by updatedAt DESC.
+  const personNoteIds = new Set(people.map((p) => p.meta.noteId));
+  const contextNotes = allNotes
+    .filter((n) => n.id !== noteId && !personNoteIds.has(n.id))
+    .slice(0, 100);
+
+  const noteTitles = contextNotes
     .map((n) => `- ${n.title || "Untitled"}: ${n.content.slice(0, 100)}`)
     .join("\n");
 
