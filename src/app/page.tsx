@@ -7,6 +7,7 @@ import TagInput from "@/components/TagInput";
 import CollectionModal from "@/components/CollectionModal";
 import AiPrompt from "@/components/AiPrompt";
 import AiResponseBlock from "@/components/AiResponseBlock";
+import Toast from "@/components/Toast";
 import { executeFormatting } from "@/editor/formatting";
 import { extractWikiLinks } from "@/editor/wiki-links";
 import { extractInlineTags } from "@/lib/extract-tags";
@@ -24,6 +25,7 @@ export default function Home() {
   const [tagInputPosition, setTagInputPosition] = useState({ top: 0, left: 0 });
   const [collectionModal, setCollectionModal] = useState<"open" | "new" | null>(null);
   const [showAiPrompt, setShowAiPrompt] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const [aiResponse, setAiResponse] = useState<{
     prompt: string;
     response: string;
@@ -334,6 +336,9 @@ export default function Home() {
           }}
           onClose={() => setCollectionModal(null)}
         />
+      )}
+      {toast && (
+        <Toast message={toast} onDismiss={() => setToast(null)} />
       )}
     </main>
   );
