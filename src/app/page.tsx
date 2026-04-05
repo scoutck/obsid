@@ -5,6 +5,7 @@ import Editor from "@/components/Editor";
 import NoteSearchModal from "@/components/NoteSearchModal";
 import TagInput from "@/components/TagInput";
 import CollectionModal from "@/components/CollectionModal";
+import PeopleModal from "@/components/PeopleModal";
 import AiPrompt from "@/components/AiPrompt";
 import AiResponseBlock from "@/components/AiResponseBlock";
 import Toast from "@/components/Toast";
@@ -24,6 +25,7 @@ export default function Home() {
   const [showTagInput, setShowTagInput] = useState(false);
   const [tagInputPosition, setTagInputPosition] = useState({ top: 0, left: 0 });
   const [collectionModal, setCollectionModal] = useState<"open" | "new" | null>(null);
+  const [showPeopleModal, setShowPeopleModal] = useState(false);
   const [showAiPrompt, setShowAiPrompt] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [aiResponse, setAiResponse] = useState<{
@@ -241,6 +243,11 @@ export default function Home() {
         return;
       }
 
+      if (command.action === "org:people") {
+        setShowPeopleModal(true);
+        return;
+      }
+
       if (command.action === "ai:ask") {
         setShowAiPrompt(true);
         return;
@@ -420,6 +427,15 @@ export default function Home() {
           onSubmit={handleAddTag}
           onClose={() => setShowTagInput(false)}
           position={tagInputPosition}
+        />
+      )}
+      {showPeopleModal && (
+        <PeopleModal
+          onSelectNote={(note) => {
+            setShowPeopleModal(false);
+            loadNote(note.id);
+          }}
+          onClose={() => setShowPeopleModal(false)}
         />
       )}
       {collectionModal && (

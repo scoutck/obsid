@@ -26,6 +26,7 @@ export const slashCommands: SlashCommand[] = [
   { label: "Search Notes", category: "Organization", description: "Full-text search", action: "org:search" },
   { label: "Open Collection", category: "Organization", description: "Open a saved collection", action: "org:open-collection" },
   { label: "New Collection", category: "Organization", description: "Create a collection", action: "org:new-collection" },
+  { label: "People", category: "Organization", description: "View and manage people", action: "org:people" },
   // AI
   { label: "Ask Claude", category: "AI", description: "Ask AI about your notes", action: "ai:ask" },
   { label: "Organize", category: "AI", description: "AI-tag and link this note", action: "ai:organize" },
