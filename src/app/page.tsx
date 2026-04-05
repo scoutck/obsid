@@ -33,6 +33,7 @@ export default function Home() {
   } | null>(null);
   const editorViewRef = useRef<EditorView | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const recentSiblingsRef = useRef<string[]>([]);
 
   // Load most recent note or create a welcome note on first launch
   useEffect(() => {
@@ -67,13 +68,49 @@ export default function Home() {
     init();
   }, []);
 
-  const loadNote = useCallback(async (id: string) => {
-    const res = await fetch(`/api/notes/${id}`);
-    const note = await res.json();
-    setNoteId(note.id);
-    setContent(note.content);
-    setNoteTags(note.tags || []);
-  }, []);
+  const organizeNote = useCallback(
+    async (id: string) => {
+      const res = await fetch(`/api/notes/${id}`);
+      const note = await res.json();
+
+      const organizeRes = await fetch("/api/ai/organize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          noteId: id,
+          title: note.title,
+          content: note.content,
+          recentSiblingIds: recentSiblingsRef.current.filter((sid) => sid !== id),
+        }),
+      });
+
+      if (!organizeRes.ok) return null;
+      return organizeRes.json();
+    },
+    []
+  );
+
+  const loadNote = useCallback(
+    async (id: string) => {
+      // Organize previous note in background (fire-and-forget)
+      if (noteId && noteId !== id) {
+        organizeNote(noteId);
+      }
+
+      const res = await fetch(`/api/notes/${id}`);
+      const note = await res.json();
+      setNoteId(note.id);
+      setContent(note.content);
+      setNoteTags(note.tags || []);
+
+      // Track recent siblings
+      recentSiblingsRef.current = [
+        id,
+        ...recentSiblingsRef.current.filter((sid) => sid !== id),
+      ].slice(0, 5);
+    },
+    [noteId, organizeNote]
+  );
 
   const handleWikiLinkClick = useCallback(
     async (title: string) => {
@@ -186,6 +223,24 @@ export default function Home() {
         return;
       }
 
+      if (command.action === "ai:organize") {
+        if (!noteId) return;
+        setToast("Organizing...");
+        organizeNote(noteId).then((result) => {
+          if (result) {
+            loadNote(noteId);
+            const parts: string[] = [];
+            if (result.tagsAdded?.length) parts.push(`${result.tagsAdded.length} tags`);
+            if (result.linksAdded?.length) parts.push(`${result.linksAdded.length} links`);
+            if (result.peopleResolved?.length) parts.push(`${result.peopleResolved.length} people`);
+            setToast(parts.length > 0 ? `Added ${parts.join(", ")}` : "Already organized");
+          } else {
+            setToast("Organize failed");
+          }
+        });
+        return;
+      }
+
       if (command.action === "ai:ask") {
         setShowAiPrompt(true);
         return;
@@ -193,7 +248,7 @@ export default function Home() {
 
       console.log("Unhandled command:", command.action);
     },
-    [loadNote]
+    [loadNote, noteId, organizeNote]
   );
 
   const handleAddTag = useCallback(

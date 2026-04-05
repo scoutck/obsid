@@ -28,6 +28,7 @@ export const slashCommands: SlashCommand[] = [
   { label: "New Collection", category: "Organization", description: "Create a collection", action: "org:new-collection" },
   // AI
   { label: "Ask Claude", category: "AI", description: "Ask AI about your notes", action: "ai:ask" },
+  { label: "Organize", category: "AI", description: "AI-tag and link this note", action: "ai:organize" },
 ];
 
 export function filterCommands(query: string): SlashCommand[] {
