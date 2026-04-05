@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   createPerson,
-  getPerson,
   getPersonByAlias,
   listPeople,
-  updatePerson,
   addNotePerson,
   getNotePeople,
   getNotesMentioning,

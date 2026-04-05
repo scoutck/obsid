@@ -34,9 +34,8 @@ export default function TagMenu({
     t.tag.toLowerCase().includes(query.toLowerCase())
   );
 
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setSelectedIndex(0); }, [query]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {

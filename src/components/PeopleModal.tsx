@@ -55,9 +55,8 @@ export default function PeopleModal({ onSelectNote, onClose }: PeopleModalProps)
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleResolve = async (name: string, personNoteId: string, noteIds: string[]) => {
     for (const noteId of noteIds) {
