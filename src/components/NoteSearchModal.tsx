@@ -47,8 +47,8 @@ export default function NoteSearchModal({ onSelect, onClose }: NoteSearchModalPr
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/50">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-full max-w-md overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/20">
+      <div className="bg-white border border-zinc-200 rounded-lg shadow-lg w-full max-w-md overflow-hidden">
         <input
           ref={inputRef}
           type="text"
@@ -56,19 +56,19 @@ export default function NoteSearchModal({ onSelect, onClose }: NoteSearchModalPr
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="w-full px-4 py-3 bg-transparent text-zinc-100 placeholder-zinc-500 outline-none border-b border-zinc-700"
+          className="w-full px-4 py-3 bg-transparent text-zinc-900 placeholder-zinc-400 outline-none border-b border-zinc-200"
         />
         <div className="max-h-64 overflow-y-auto">
           {results.map((note, i) => (
             <button
               key={note.id}
-              className={`w-full text-left px-4 py-2 hover:bg-zinc-800 ${
-                i === selectedIndex ? "bg-zinc-800" : ""
+              className={`w-full text-left px-4 py-2 hover:bg-zinc-100 ${
+                i === selectedIndex ? "bg-zinc-100" : ""
               }`}
               onMouseEnter={() => setSelectedIndex(i)}
               onClick={() => onSelect(note)}
             >
-              <div className="text-sm text-zinc-100">
+              <div className="text-sm text-zinc-800">
                 {note.title || "Untitled"}
               </div>
               <div className="text-xs text-zinc-500 truncate">
@@ -77,7 +77,7 @@ export default function NoteSearchModal({ onSelect, onClose }: NoteSearchModalPr
             </button>
           ))}
           {results.length === 0 && (
-            <div className="px-4 py-3 text-sm text-zinc-500">No notes found</div>
+            <div className="px-4 py-3 text-sm text-zinc-400">No notes found</div>
           )}
         </div>
       </div>

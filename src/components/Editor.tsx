@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { EditorView, keymap } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { markdown } from "@codemirror/lang-markdown";
+import { GFM } from "@lezer/markdown";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import { markdownPreview } from "@/editor/markdown-preview";
@@ -14,16 +15,23 @@ import { type SlashCommand } from "@/editor/slash-commands";
 const theme = EditorView.theme({
   "&": {
     backgroundColor: "transparent",
-    color: "#fafafa",
+    color: "#27272a",
   },
   ".cm-cursor": {
-    borderLeftColor: "#fafafa",
+    borderLeftColor: "#27272a",
+    borderLeftWidth: "2px",
+  },
+  "&.cm-focused .cm-cursor": {
+    borderLeftColor: "#27272a",
+  },
+  ".cm-content": {
+    caretColor: "#27272a",
   },
   ".cm-activeLine": {
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    backgroundColor: "rgba(0, 0, 0, 0.03)",
   },
   ".cm-selectionBackground, ::selection": {
-    backgroundColor: "rgba(99, 102, 241, 0.3) !important",
+    backgroundColor: "rgba(99, 102, 241, 0.2) !important",
   },
   ".cm-gutters": {
     display: "none",
@@ -31,6 +39,7 @@ const theme = EditorView.theme({
   ".cm-heading": {
     fontWeight: "700",
     fontSize: "1.25em",
+    color: "#18181b",
   },
   ".cm-bold": {
     fontWeight: "700",
@@ -40,16 +49,18 @@ const theme = EditorView.theme({
   },
   ".cm-strikethrough": {
     textDecoration: "line-through",
+    color: "#a1a1aa",
   },
   ".cm-highlight": {
     backgroundColor: "rgba(250, 204, 21, 0.3)",
     borderRadius: "2px",
   },
   ".cm-inline-code": {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: "rgba(0, 0, 0, 0.06)",
     borderRadius: "3px",
     padding: "0 4px",
     fontFamily: "monospace",
+    color: "#dc2626",
   },
 });
 
@@ -71,6 +82,7 @@ interface EditorProps {
 export default function Editor({ initialContent = "", onChange, onSlashCommand, onWikiLinkClick, editorViewRef }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const initialContentRef = useRef(initialContent);
 
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -96,28 +108,33 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
     const view = viewRef.current;
     if (!view) return;
 
-    setSlashMenu((prev) => {
-      if (prev.slashPos >= 0) {
-        const cursorPos = view.state.selection.main.head;
-        view.dispatch({
-          changes: { from: prev.slashPos, to: cursorPos, insert: "" },
-        });
-      }
-      return { ...prev, open: false };
-    });
+    // Remove the /query text first
+    const { slashPos } = slashMenu;
+    if (slashPos >= 0) {
+      const cursorPos = view.state.selection.main.head;
+      view.dispatch({
+        changes: { from: slashPos, to: cursorPos, insert: "" },
+      });
+    }
 
-    onSlashCommandRef.current?.(command, view);
-  }, []);
+    setSlashMenu((prev) => ({ ...prev, open: false }));
+
+    // Execute command after view state is settled
+    requestAnimationFrame(() => {
+      onSlashCommandRef.current?.(command, view);
+      view.focus();
+    });
+  }, [slashMenu]);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     const state = EditorState.create({
-      doc: initialContent,
+      doc: initialContentRef.current,
       extensions: [
         keymap.of([...defaultKeymap, ...historyKeymap]),
         history(),
-        markdown(),
+        markdown({ extensions: [GFM] }),
         syntaxHighlighting(defaultHighlightStyle),
         markdownPreview,
         wikiLinkDecorations,
@@ -186,11 +203,26 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
     viewRef.current = view;
     if (editorViewRef) editorViewRef.current = view;
 
+    // Place cursor at end of content, on a new line
+    const docLen = view.state.doc.length;
+    const lastLine = view.state.doc.lineAt(docLen);
+    const needsNewline = lastLine.text.length > 0;
+    if (needsNewline) {
+      view.dispatch({
+        changes: { from: docLen, insert: "\n" },
+        selection: { anchor: docLen + 1 },
+      });
+    } else {
+      view.dispatch({ selection: { anchor: docLen } });
+    }
+    view.focus();
+
     return () => {
       if (editorViewRef) editorViewRef.current = null;
       view.destroy();
     };
-  }, [initialContent]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>

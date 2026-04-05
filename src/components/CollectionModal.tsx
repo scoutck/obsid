@@ -52,46 +52,46 @@ export default function CollectionModal({ mode, onSelectNote, onClose }: Collect
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/50">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-full max-w-md overflow-hidden" onKeyDown={handleKeyDown}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/20">
+      <div className="bg-white border border-zinc-200 rounded-lg shadow-lg w-full max-w-md overflow-hidden" onKeyDown={handleKeyDown}>
         {mode === "new" ? (
           <div className="p-4 space-y-3">
-            <h3 className="text-sm font-medium text-zinc-300">New Collection</h3>
-            <input ref={inputRef} type="text" placeholder="Collection name..." value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 bg-zinc-800 text-zinc-100 text-sm rounded border border-zinc-600 outline-none focus:border-indigo-500" />
-            <input type="text" placeholder="Filter by tags (comma separated)..." value={filterTags} onChange={(e) => setFilterTags(e.target.value)} className="w-full px-3 py-2 bg-zinc-800 text-zinc-100 text-sm rounded border border-zinc-600 outline-none focus:border-indigo-500" />
-            <input type="text" placeholder="Filter by type..." value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full px-3 py-2 bg-zinc-800 text-zinc-100 text-sm rounded border border-zinc-600 outline-none focus:border-indigo-500" />
+            <h3 className="text-sm font-medium text-zinc-700">New Collection</h3>
+            <input ref={inputRef} type="text" placeholder="Collection name..." value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 bg-zinc-50 text-zinc-900 text-sm rounded border border-zinc-300 outline-none focus:border-indigo-500" />
+            <input type="text" placeholder="Filter by tags (comma separated)..." value={filterTags} onChange={(e) => setFilterTags(e.target.value)} className="w-full px-3 py-2 bg-zinc-50 text-zinc-900 text-sm rounded border border-zinc-300 outline-none focus:border-indigo-500" />
+            <input type="text" placeholder="Filter by type..." value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full px-3 py-2 bg-zinc-50 text-zinc-900 text-sm rounded border border-zinc-300 outline-none focus:border-indigo-500" />
             <div className="flex gap-2 justify-end">
-              <button onClick={onClose} className="px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200">Cancel</button>
+              <button onClick={onClose} className="px-3 py-1.5 text-sm text-zinc-500 hover:text-zinc-700">Cancel</button>
               <button onClick={handleCreateCollection} className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-500">Create</button>
             </div>
           </div>
         ) : selectedCollection ? (
           <div>
-            <div className="px-4 py-3 border-b border-zinc-700 flex items-center justify-between">
-              <span className="text-sm font-medium text-zinc-300">{selectedCollection.name}</span>
-              <button onClick={() => setSelectedCollection(null)} className="text-xs text-zinc-500 hover:text-zinc-300">Back</button>
+            <div className="px-4 py-3 border-b border-zinc-200 flex items-center justify-between">
+              <span className="text-sm font-medium text-zinc-700">{selectedCollection.name}</span>
+              <button onClick={() => setSelectedCollection(null)} className="text-xs text-zinc-400 hover:text-zinc-600">Back</button>
             </div>
             <div className="max-h-64 overflow-y-auto">
               {notes.map((note) => (
-                <button key={note.id} className="w-full text-left px-4 py-2 hover:bg-zinc-800" onClick={() => onSelectNote(note)}>
-                  <div className="text-sm text-zinc-100">{note.title || "Untitled"}</div>
+                <button key={note.id} className="w-full text-left px-4 py-2 hover:bg-zinc-100" onClick={() => onSelectNote(note)}>
+                  <div className="text-sm text-zinc-800">{note.title || "Untitled"}</div>
                 </button>
               ))}
-              {notes.length === 0 && <div className="px-4 py-3 text-sm text-zinc-500">No notes in this collection</div>}
+              {notes.length === 0 && <div className="px-4 py-3 text-sm text-zinc-400">No notes in this collection</div>}
             </div>
           </div>
         ) : (
           <div>
-            <div className="px-4 py-3 border-b border-zinc-700">
-              <span className="text-sm font-medium text-zinc-300">Collections</span>
+            <div className="px-4 py-3 border-b border-zinc-200">
+              <span className="text-sm font-medium text-zinc-700">Collections</span>
             </div>
             <div className="max-h-64 overflow-y-auto">
               {collections.map((col) => (
-                <button key={col.id} className="w-full text-left px-4 py-2 hover:bg-zinc-800" onClick={() => handleSelectCollection(col)}>
-                  <div className="text-sm text-zinc-100">{col.name}</div>
+                <button key={col.id} className="w-full text-left px-4 py-2 hover:bg-zinc-100" onClick={() => handleSelectCollection(col)}>
+                  <div className="text-sm text-zinc-800">{col.name}</div>
                 </button>
               ))}
-              {collections.length === 0 && <div className="px-4 py-3 text-sm text-zinc-500">No collections yet</div>}
+              {collections.length === 0 && <div className="px-4 py-3 text-sm text-zinc-400">No collections yet</div>}
             </div>
           </div>
         )}

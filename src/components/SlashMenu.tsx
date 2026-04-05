@@ -59,7 +59,7 @@ export default function SlashMenu({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl py-1 w-64 max-h-72 overflow-y-auto"
+      className="fixed z-50 bg-white border border-zinc-200 rounded-lg shadow-lg py-1 w-64 max-h-72 overflow-y-auto"
       style={{ top: position.top, left: position.left }}
     >
       {filtered.map((cmd, i) => {
@@ -73,13 +73,13 @@ export default function SlashMenu({
               </div>
             )}
             <button
-              className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-zinc-800 ${
-                i === selectedIndex ? "bg-zinc-800" : ""
+              className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-zinc-100 ${
+                i === selectedIndex ? "bg-zinc-100" : ""
               }`}
               onMouseEnter={() => setSelectedIndex(i)}
               onClick={() => onSelect(cmd)}
             >
-              <span className="text-sm text-zinc-100">{cmd.label}</span>
+              <span className="text-sm text-zinc-800">{cmd.label}</span>
               <span className="text-xs text-zinc-500">{cmd.description}</span>
             </button>
           </div>

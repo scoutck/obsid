@@ -6,16 +6,16 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
-import { RangeSetBuilder } from "@codemirror/state";
+import { Range } from "@codemirror/state";
 
 const headingStyle = Decoration.mark({ class: "cm-heading" });
 const boldStyle = Decoration.mark({ class: "cm-bold" });
 const italicStyle = Decoration.mark({ class: "cm-italic" });
 const strikethroughStyle = Decoration.mark({ class: "cm-strikethrough" });
-const highlightStyle = Decoration.mark({ class: "cm-highlight" });
 const codeStyle = Decoration.mark({ class: "cm-inline-code" });
+const hideMarker = Decoration.replace({});
 
-class HorizontalRuleWidget extends WidgetType {
+class HrWidget extends WidgetType {
   toDOM() {
     const hr = document.createElement("hr");
     hr.className = "cm-hr";
@@ -31,37 +31,117 @@ export const markdownPreview = ViewPlugin.fromClass(
       this.decorations = this.buildDecorations(view);
     }
 
-    update(update: { docChanged: boolean; viewportChanged: boolean; view: EditorView }) {
-      if (update.docChanged || update.viewportChanged) {
+    update(update: {
+      docChanged: boolean;
+      viewportChanged: boolean;
+      selectionSet: boolean;
+      view: EditorView;
+    }) {
+      if (update.docChanged || update.viewportChanged || update.selectionSet) {
         this.decorations = this.buildDecorations(update.view);
       }
     }
 
     buildDecorations(view: EditorView): DecorationSet {
-      const builder = new RangeSetBuilder<Decoration>();
+      const decorations: Range<Decoration>[] = [];
       const tree = syntaxTree(view.state);
+      const cursorLine = view.state.doc.lineAt(
+        view.state.selection.main.head
+      ).number;
 
       tree.iterate({
         enter(node) {
-          if (node.name === "ATXHeading1" || node.name === "ATXHeading2") {
-            builder.add(node.from, node.to, headingStyle);
-          }
+          const nodeLine = view.state.doc.lineAt(node.from).number;
+          const active = nodeLine === cursorLine;
+
+          // Bold: **text**
           if (node.name === "StrongEmphasis") {
-            builder.add(node.from, node.to, boldStyle);
+            const len = node.to - node.from;
+            if (active || len <= 4) {
+              decorations.push(boldStyle.range(node.from, node.to));
+            } else {
+              decorations.push(hideMarker.range(node.from, node.from + 2));
+              decorations.push(boldStyle.range(node.from + 2, node.to - 2));
+              decorations.push(hideMarker.range(node.to - 2, node.to));
+            }
           }
+
+          // Italic: *text*
           if (node.name === "Emphasis") {
-            builder.add(node.from, node.to, italicStyle);
+            const len = node.to - node.from;
+            if (active || len <= 2) {
+              decorations.push(italicStyle.range(node.from, node.to));
+            } else {
+              decorations.push(hideMarker.range(node.from, node.from + 1));
+              decorations.push(italicStyle.range(node.from + 1, node.to - 1));
+              decorations.push(hideMarker.range(node.to - 1, node.to));
+            }
           }
+
+          // Strikethrough: ~~text~~
           if (node.name === "Strikethrough") {
-            builder.add(node.from, node.to, strikethroughStyle);
+            const len = node.to - node.from;
+            if (active || len <= 4) {
+              decorations.push(
+                strikethroughStyle.range(node.from, node.to)
+              );
+            } else {
+              decorations.push(hideMarker.range(node.from, node.from + 2));
+              decorations.push(
+                strikethroughStyle.range(node.from + 2, node.to - 2)
+              );
+              decorations.push(hideMarker.range(node.to - 2, node.to));
+            }
           }
+
+          // Inline code: `text`
           if (node.name === "InlineCode") {
-            builder.add(node.from, node.to, codeStyle);
+            const len = node.to - node.from;
+            if (active || len <= 2) {
+              decorations.push(codeStyle.range(node.from, node.to));
+            } else {
+              decorations.push(hideMarker.range(node.from, node.from + 1));
+              decorations.push(codeStyle.range(node.from + 1, node.to - 1));
+              decorations.push(hideMarker.range(node.to - 1, node.to));
+            }
+          }
+
+          // Headings: # or ##
+          if (
+            node.name === "ATXHeading1" ||
+            node.name === "ATXHeading2"
+          ) {
+            if (active) {
+              decorations.push(headingStyle.range(node.from, node.to));
+            } else {
+              const line = view.state.doc.lineAt(node.from);
+              const hashMatch = line.text.match(/^(#{1,2})\s/);
+              if (hashMatch) {
+                const markerEnd = node.from + hashMatch[0].length;
+                decorations.push(hideMarker.range(node.from, markerEnd));
+                if (markerEnd < node.to) {
+                  decorations.push(headingStyle.range(markerEnd, node.to));
+                }
+              } else {
+                decorations.push(headingStyle.range(node.from, node.to));
+              }
+            }
+          }
+
+          // Horizontal rule: ---
+          if (node.name === "HorizontalRule") {
+            if (!active) {
+              decorations.push(
+                Decoration.replace({
+                  widget: new HrWidget(),
+                }).range(node.from, node.to)
+              );
+            }
           }
         },
       });
 
-      return builder.finish();
+      return Decoration.set(decorations, true);
     }
   },
   { decorations: (v) => v.decorations }

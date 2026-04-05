@@ -28,7 +28,7 @@ export default function TagInput({ existingTags, onSubmit, onClose, position }: 
 
   return (
     <div
-      className="fixed z-50 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl p-2 w-56"
+      className="fixed z-50 bg-white border border-zinc-200 rounded-lg shadow-lg p-2 w-56"
       style={{ top: position.top, left: position.left }}
     >
       <input
@@ -39,12 +39,12 @@ export default function TagInput({ existingTags, onSubmit, onClose, position }: 
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={onClose}
-        className="w-full px-2 py-1 bg-zinc-800 text-zinc-100 text-sm rounded border border-zinc-600 outline-none focus:border-indigo-500"
+        className="w-full px-2 py-1 bg-zinc-50 text-zinc-900 text-sm rounded border border-zinc-300 outline-none focus:border-indigo-500"
       />
       {existingTags.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {existingTags.map((tag) => (
-            <span key={tag} className="px-2 py-0.5 text-xs bg-zinc-800 text-zinc-400 rounded">
+            <span key={tag} className="px-2 py-0.5 text-xs bg-zinc-100 text-zinc-600 rounded">
               {tag}
             </span>
           ))}

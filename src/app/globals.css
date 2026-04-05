@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #09090b;
-  --foreground: #fafafa;
+  --background: #faf9f6;
+  --foreground: #1c1c1e;
 }
 
 body {
@@ -34,19 +34,19 @@ body {
 /* Horizontal rule in editor */
 .cm-hr {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-top: 1px solid #d4d4d8;
   margin: 1em 0;
 }
 
 /* Wiki-link styling */
 .cm-wiki-link {
-  color: #818cf8;
+  color: #4f46e5;
   cursor: pointer;
   text-decoration: underline;
-  text-decoration-color: rgba(129, 140, 248, 0.4);
+  text-decoration-color: rgba(79, 70, 229, 0.4);
   text-underline-offset: 2px;
 }
 
 .cm-wiki-link:hover {
-  text-decoration-color: #818cf8;
+  text-decoration-color: #4f46e5;
 }

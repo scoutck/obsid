@@ -16,6 +16,7 @@ import type { Note } from "@/types";
 export default function Home() {
   const [noteId, setNoteId] = useState<string | null>(null);
   const [content, setContent] = useState("");
+  const contentRef = useRef("");
   const [noteTags, setNoteTags] = useState<string[]>([]);
   const [showNoteSearch, setShowNoteSearch] = useState(false);
   const [showTagInput, setShowTagInput] = useState(false);
@@ -210,7 +211,7 @@ export default function Home() {
   // Auto-save with debounce
   const handleChange = useCallback(
     (newContent: string) => {
-      setContent(newContent);
+      contentRef.current = newContent;
       if (!noteId) return;
 
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -240,13 +241,13 @@ export default function Home() {
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, currentNoteContent: content }),
+        body: JSON.stringify({ prompt, currentNoteContent: contentRef.current }),
       });
 
       const text = await res.text();
       setAiResponse({ prompt, response: text, isLoading: false });
     },
-    [content]
+    []
   );
 
   const handleAiKeep = useCallback(
@@ -257,6 +258,7 @@ export default function Home() {
         view.dispatch({
           changes: { from: pos, insert: "\n\n" + text },
         });
+        requestAnimationFrame(() => view.focus());
       }
       setAiResponse(null);
     },
@@ -265,6 +267,7 @@ export default function Home() {
 
   const handleAiDismiss = useCallback(() => {
     setAiResponse(null);
+    requestAnimationFrame(() => editorViewRef.current?.focus());
   }, []);
 
   if (!noteId) {
