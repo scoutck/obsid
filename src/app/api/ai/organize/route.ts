@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { updateNote, getRecentNotes, listNotes } from "@/lib/notes";
+import { getNote, updateNote, getRecentNotes, listNotes } from "@/lib/notes";
 import { getTagVocabulary, extractInlineTags } from "@/lib/tags";
 import {
   listPeople,
@@ -21,7 +21,15 @@ interface OrganizeResult {
 }
 
 export async function POST(request: NextRequest) {
-  const { noteId, title, content, recentSiblingIds } = await request.json();
+  const { noteId, recentSiblingIds } = await request.json();
+
+  // Fetch note and snapshot updatedAt for staleness detection
+  const note = await getNote(noteId);
+  if (!note) {
+    return Response.json({ error: "Note not found" }, { status: 404 });
+  }
+  const snapshotUpdatedAt = note.updatedAt.getTime();
+  const { title, content } = note;
 
   // Gather vault context
   const [tagVocab, allNotes, recentSiblings, people] = await Promise.all([
@@ -173,6 +181,12 @@ Return JSON in this exact format:
       await addNotePerson(noteId, newPerson.note.id);
       resolvedPeople.push(person.name);
     }
+  }
+
+  // Staleness check: if the note was modified while AI was processing, discard
+  const currentNote = await getNote(noteId);
+  if (!currentNote || currentNote.updatedAt.getTime() !== snapshotUpdatedAt) {
+    return Response.json({ stale: true });
   }
 
   // Compute final tags from updated content

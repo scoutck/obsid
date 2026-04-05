@@ -73,17 +73,11 @@ export default function Home() {
   const organizeNote = useCallback(
     async (id: string) => {
       try {
-        const res = await fetch(`/api/notes/${id}`);
-        if (!res.ok) return null;
-        const note = await res.json();
-
         const organizeRes = await fetch("/api/ai/organize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             noteId: id,
-            title: note.title,
-            content: note.content,
             recentSiblingIds: recentSiblingsRef.current.filter((sid) => sid !== id),
           }),
         });
@@ -234,16 +228,20 @@ export default function Home() {
         if (!noteId) return;
         setToast("Organizing...");
         organizeNote(noteId).then((result) => {
-          if (result) {
-            loadNote(noteId);
-            const parts: string[] = [];
-            if (result.tagsAdded?.length) parts.push(`${result.tagsAdded.length} tags`);
-            if (result.linksAdded?.length) parts.push(`${result.linksAdded.length} links`);
-            if (result.peopleResolved?.length) parts.push(`${result.peopleResolved.length} people`);
-            setToast(parts.length > 0 ? `Added ${parts.join(", ")}` : "Already organized");
-          } else {
+          if (!result) {
             setToast("Organize failed");
+            return;
           }
+          if (result.stale) {
+            setToast("Note changed — organize skipped");
+            return;
+          }
+          loadNote(noteId);
+          const parts: string[] = [];
+          if (result.tagsAdded?.length) parts.push(`${result.tagsAdded.length} tags`);
+          if (result.linksAdded?.length) parts.push(`${result.linksAdded.length} links`);
+          if (result.peopleResolved?.length) parts.push(`${result.peopleResolved.length} people`);
+          setToast(parts.length > 0 ? `Added ${parts.join(", ")}` : "Already organized");
         });
         return;
       }
