@@ -11,6 +11,7 @@ import { markdownPreview } from "@/editor/markdown-preview";
 import { wikiLinkDecorations } from "@/editor/wiki-links";
 import { tagSyntaxDecorations } from "@/editor/tag-syntax";
 import SlashMenu from "@/components/SlashMenu";
+import TagMenu from "@/components/TagMenu";
 import { type SlashCommand } from "@/editor/slash-commands";
 
 const theme = EditorView.theme({
@@ -105,6 +106,13 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
     slashPos: -1,
   });
 
+  const [tagMenu, setTagMenu] = useState<{
+    open: boolean;
+    query: string;
+    position: { top: number; left: number };
+    hashPos: number;
+  }>({ open: false, query: "", position: { top: 0, left: 0 }, hashPos: -1 });
+
   const closeSlashMenu = useCallback(() => {
     setSlashMenu((prev) => ({ ...prev, open: false }));
   }, []);
@@ -130,6 +138,25 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
       view.focus();
     });
   }, [slashMenu]);
+
+  const closeTagMenu = useCallback(() => {
+    setTagMenu((prev) => ({ ...prev, open: false }));
+  }, []);
+
+  const handleTagSelect = useCallback((tag: string) => {
+    const view = viewRef.current;
+    if (!view) return;
+
+    const { hashPos } = tagMenu;
+    if (hashPos >= 0) {
+      const cursorPos = view.state.selection.main.head;
+      view.dispatch({
+        changes: { from: hashPos, to: cursorPos, insert: `#${tag} ` },
+      });
+    }
+    setTagMenu((prev) => ({ ...prev, open: false }));
+    requestAnimationFrame(() => view.focus());
+  }, [tagMenu]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -171,6 +198,7 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
           const sel = update.state.selection.main;
           if (!sel.empty) {
             setSlashMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
+            setTagMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
             return;
           }
 
@@ -196,6 +224,28 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
             }
           } else {
             setSlashMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
+          }
+
+          // Detect #tag autocomplete trigger (only when slash menu is not open)
+          if (!match) {
+            const hashMatch = textBeforeCursor.match(/#([a-zA-Z][a-zA-Z0-9_-]*)$/);
+            if (hashMatch && !/^#{1,6}\s/.test(lineText)) {
+              const tagQuery = hashMatch[1];
+              const hashPos = cursorPos - hashMatch[0].length;
+              const coords = update.view.coordsAtPos(hashPos);
+              if (coords) {
+                setTagMenu({
+                  open: true,
+                  query: tagQuery,
+                  position: { top: coords.bottom + 4, left: coords.left },
+                  hashPos,
+                });
+              }
+            } else {
+              setTagMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
+            }
+          } else {
+            setTagMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
           }
         }),
       ],
@@ -239,6 +289,14 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
           position={slashMenu.position}
           onSelect={handleSlashSelect}
           onClose={closeSlashMenu}
+        />
+      )}
+      {tagMenu.open && (
+        <TagMenu
+          query={tagMenu.query}
+          position={tagMenu.position}
+          onSelect={handleTagSelect}
+          onClose={closeTagMenu}
         />
       )}
     </>
