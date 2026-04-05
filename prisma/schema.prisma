@@ -40,3 +40,13 @@ model NotePerson {
 
   @@id([noteId, personNoteId])
 }
+
+model Command {
+  id           String   @id @default(uuid())
+  noteId       String
+  line         Int
+  instruction  String
+  confirmation String   @default("")
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
+}

@@ -12,15 +12,25 @@ import Toast from "@/components/Toast";
 import { executeFormatting } from "@/editor/formatting";
 import { extractWikiLinks } from "@/editor/wiki-links";
 import { extractInlineTags } from "@/lib/extract-tags";
+import { updateCommandEffect } from "@/editor/command-widgets";
 import type { SlashCommand } from "@/editor/slash-commands";
 import type { EditorView } from "@codemirror/view";
 import type { Note } from "@/types";
+
+interface CommandData {
+  id: string;
+  line: number;
+  instruction: string;
+  confirmation: string;
+  status: string;
+}
 
 export default function Home() {
   const [noteId, setNoteId] = useState<string | null>(null);
   const [content, setContent] = useState("");
   const contentRef = useRef("");
   const [noteTags, setNoteTags] = useState<string[]>([]);
+  const [noteCommands, setNoteCommands] = useState<CommandData[]>([]);
   const [showNoteSearch, setShowNoteSearch] = useState(false);
   const [showTagInput, setShowTagInput] = useState(false);
   const [tagInputPosition, setTagInputPosition] = useState({ top: 0, left: 0 });
@@ -115,11 +125,16 @@ export default function Home() {
         }, 2000);
       }
 
-      const res = await fetch(`/api/notes/${id}`);
-      const note = await res.json();
+      const [noteRes, cmdsRes] = await Promise.all([
+        fetch(`/api/notes/${id}`),
+        fetch(`/api/notes/${id}/commands`),
+      ]);
+      const note = await noteRes.json();
+      const cmds: CommandData[] = await cmdsRes.json();
       setNoteId(note.id);
       setContent(note.content);
       setNoteTags(note.tags || []);
+      setNoteCommands(cmds);
 
       // Track recent siblings
       recentSiblingsRef.current = [
@@ -320,14 +335,15 @@ export default function Home() {
   );
 
   const handleClaudeCommand = useCallback(
-    async (instruction: string, cursorPosition: number) => {
+    async (instruction: string, commandId: string, line: number) => {
       if (!noteId) return;
 
       const view = editorViewRef.current;
       if (!view) return;
 
       const doc = view.state.doc.toString();
-      const lineAt = view.state.doc.lineAt(cursorPosition);
+      const safeLineNum = Math.min(line, view.state.doc.lines);
+      const cursorPosition = view.state.doc.line(safeLineNum).from;
 
       const res = await fetch("/api/ai/command", {
         method: "POST",
@@ -338,21 +354,28 @@ export default function Home() {
           noteContent: doc,
           noteTitle: doc.match(/^#\s+(.+)$/m)?.[1] ?? "",
           cursorPosition,
+          line,
         }),
       });
 
       if (!res.ok) {
-        const insertPos = lineAt.to;
         view.dispatch({
-          changes: { from: insertPos, insert: "\n\u2717 command failed" },
+          effects: updateCommandEffect.of({
+            id: commandId,
+            confirmation: "command failed",
+            status: "error",
+          }),
         });
         return;
       }
 
-      const { confirmation } = await res.json();
-      const insertPos = lineAt.to;
+      const result = await res.json();
       view.dispatch({
-        changes: { from: insertPos, insert: `\n\u2713 ${confirmation}` },
+        effects: updateCommandEffect.of({
+          id: commandId,
+          confirmation: result.confirmation,
+          status: "done",
+        }),
       });
     },
     [noteId]
@@ -409,6 +432,7 @@ export default function Home() {
         <Editor
           key={noteId}
           initialContent={content}
+          initialCommands={noteCommands}
           onChange={handleChange}
           onSlashCommand={handleSlashCommand}
           onWikiLinkClick={handleWikiLinkClick}

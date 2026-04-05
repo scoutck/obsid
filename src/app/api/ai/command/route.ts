@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { vaultTools, executeTool } from "@/lib/ai-tools";
+import { createCommand, updateCommand } from "@/lib/commands";
 
 const anthropic = new Anthropic();
 
 export async function POST(request: NextRequest) {
-  const { instruction, noteId, noteContent, noteTitle, cursorPosition } =
+  const { instruction, noteId, noteContent, noteTitle, cursorPosition, line } =
     await request.json();
 
   // Extract context around cursor (5 lines before and after)
@@ -38,8 +39,12 @@ You have tools to search, read, create, and update notes. Execute the user's ins
     { role: "user", content: instruction },
   ];
 
-  // Suppress unused variable warning — noteId is available for future tool context
-  void noteId;
+  // Create the command record up front
+  const command = await createCommand({
+    noteId,
+    line: line ?? 0,
+    instruction,
+  });
 
   let response = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
@@ -84,5 +89,11 @@ You have tools to search, read, create, and update notes. Execute the user's ins
     if (block.type === "text") finalText += block.text;
   }
 
-  return Response.json({ confirmation: finalText.trim() });
+  const confirmation = finalText.trim();
+  const updated = await updateCommand(command.id, {
+    confirmation,
+    status: "done",
+  });
+
+  return Response.json(updated);
 }

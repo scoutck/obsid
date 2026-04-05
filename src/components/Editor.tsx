@@ -9,7 +9,11 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import { markdownPreview } from "@/editor/markdown-preview";
 import { wikiLinkDecorations } from "@/editor/wiki-links";
-import { tagSyntaxDecorations, claudeLineDecorations } from "@/editor/tag-syntax";
+import { tagSyntaxDecorations } from "@/editor/tag-syntax";
+import {
+  commandWidgetsExtension,
+  addCommandEffect,
+} from "@/editor/command-widgets";
 import SlashMenu from "@/components/SlashMenu";
 import TagMenu from "@/components/TagMenu";
 import { type SlashCommand } from "@/editor/slash-commands";
@@ -85,19 +89,29 @@ interface SlashMenuState {
   slashPos: number;
 }
 
+interface CommandData {
+  id: string;
+  line: number;
+  instruction: string;
+  confirmation: string;
+  status: string;
+}
+
 interface EditorProps {
   initialContent?: string;
+  initialCommands?: CommandData[];
   onChange?: (content: string) => void;
   onSlashCommand?: (command: SlashCommand, view: EditorView) => void;
   onWikiLinkClick?: (title: string) => void;
-  onClaudeCommand?: (instruction: string, cursorPosition: number) => void;
+  onClaudeCommand?: (instruction: string, commandId: string, line: number) => void;
   editorViewRef?: React.MutableRefObject<EditorView | null>;
 }
 
-export default function Editor({ initialContent = "", onChange, onSlashCommand, onWikiLinkClick, onClaudeCommand, editorViewRef }: EditorProps) {
+export default function Editor({ initialContent = "", initialCommands, onChange, onSlashCommand, onWikiLinkClick, onClaudeCommand, editorViewRef }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const initialContentRef = useRef(initialContent);
+  const initialCommandsRef = useRef(initialCommands);
 
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -185,13 +199,27 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
               );
               const match = line.text.match(/^\/claude\s+(.+)$/);
               if (match) {
-                onClaudeCommandRef.current?.(match[1], line.from);
-                // Insert newline and move cursor to next line so user can keep typing
-                const insertPos = line.to;
+                const lineNumber = line.number;
+                const tempId = `cmd-${Date.now()}`;
+
+                // Remove the /claude line from content and add a command widget
+                const deleteEnd = Math.min(
+                  line.to + 1,
+                  view.state.doc.length
+                );
                 view.dispatch({
-                  changes: { from: insertPos, insert: "\n" },
-                  selection: { anchor: insertPos + 1 },
+                  changes: { from: line.from, to: deleteEnd },
+                  selection: { anchor: line.from },
+                  effects: addCommandEffect.of({
+                    id: tempId,
+                    pos: line.from,
+                    instruction: match[1],
+                    confirmation: "",
+                    status: "pending",
+                  }),
                 });
+
+                onClaudeCommandRef.current?.(match[1], tempId, lineNumber);
                 return true;
               }
               return false;
@@ -205,7 +233,7 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
         markdownPreview,
         wikiLinkDecorations,
         tagSyntaxDecorations,
-        claudeLineDecorations,
+        commandWidgetsExtension,
         theme,
         EditorView.lineWrapping,
         EditorView.domEventHandlers({
@@ -311,6 +339,23 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
     } else {
       view.dispatch({ selection: { anchor: docLen } });
     }
+    // Initialize command widgets from saved commands
+    const cmds = initialCommandsRef.current;
+    if (cmds && cmds.length > 0) {
+      const effects = cmds.map((cmd) => {
+        const safeLineNum = Math.min(cmd.line, view.state.doc.lines);
+        const pos = view.state.doc.line(safeLineNum).from;
+        return addCommandEffect.of({
+          id: cmd.id,
+          pos,
+          instruction: cmd.instruction,
+          confirmation: cmd.confirmation,
+          status: cmd.status,
+        });
+      });
+      view.dispatch({ effects });
+    }
+
     view.focus();
 
     return () => {
