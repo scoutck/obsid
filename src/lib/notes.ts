@@ -81,7 +81,9 @@ export async function conditionalUpdateNote(
 
   if (sets.length === 0) return true;
 
-  sets.push(`"updatedAt" = CURRENT_TIMESTAMP`);
+  // Use ISO string (not CURRENT_TIMESTAMP) to match Prisma's format
+  sets.push(`"updatedAt" = ?`);
+  params.push(new Date().toISOString());
   params.push(id, expectedUpdatedAt.toISOString());
 
   const result = await prisma.$executeRawUnsafe(
