@@ -5,10 +5,13 @@ import Editor from "@/components/Editor";
 import NoteSearchModal from "@/components/NoteSearchModal";
 import TagInput from "@/components/TagInput";
 import CollectionModal from "@/components/CollectionModal";
+import PeopleModal from "@/components/PeopleModal";
 import AiPrompt from "@/components/AiPrompt";
 import AiResponseBlock from "@/components/AiResponseBlock";
+import Toast from "@/components/Toast";
 import { executeFormatting } from "@/editor/formatting";
 import { extractWikiLinks } from "@/editor/wiki-links";
+import { extractInlineTags } from "@/lib/extract-tags";
 import type { SlashCommand } from "@/editor/slash-commands";
 import type { EditorView } from "@codemirror/view";
 import type { Note } from "@/types";
@@ -22,7 +25,9 @@ export default function Home() {
   const [showTagInput, setShowTagInput] = useState(false);
   const [tagInputPosition, setTagInputPosition] = useState({ top: 0, left: 0 });
   const [collectionModal, setCollectionModal] = useState<"open" | "new" | null>(null);
+  const [showPeopleModal, setShowPeopleModal] = useState(false);
   const [showAiPrompt, setShowAiPrompt] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const [aiResponse, setAiResponse] = useState<{
     prompt: string;
     response: string;
@@ -30,6 +35,7 @@ export default function Home() {
   } | null>(null);
   const editorViewRef = useRef<EditorView | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const recentSiblingsRef = useRef<string[]>([]);
 
   // Load most recent note or create a welcome note on first launch
   useEffect(() => {
@@ -64,13 +70,54 @@ export default function Home() {
     init();
   }, []);
 
-  const loadNote = useCallback(async (id: string) => {
-    const res = await fetch(`/api/notes/${id}`);
-    const note = await res.json();
-    setNoteId(note.id);
-    setContent(note.content);
-    setNoteTags(note.tags || []);
-  }, []);
+  const organizeNote = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch(`/api/notes/${id}`);
+        if (!res.ok) return null;
+        const note = await res.json();
+
+        const organizeRes = await fetch("/api/ai/organize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            noteId: id,
+            title: note.title,
+            content: note.content,
+            recentSiblingIds: recentSiblingsRef.current.filter((sid) => sid !== id),
+          }),
+        });
+
+        if (!organizeRes.ok) return null;
+        return organizeRes.json();
+      } catch {
+        return null;
+      }
+    },
+    []
+  );
+
+  const loadNote = useCallback(
+    async (id: string) => {
+      // Organize previous note in background (fire-and-forget)
+      if (noteId && noteId !== id) {
+        organizeNote(noteId);
+      }
+
+      const res = await fetch(`/api/notes/${id}`);
+      const note = await res.json();
+      setNoteId(note.id);
+      setContent(note.content);
+      setNoteTags(note.tags || []);
+
+      // Track recent siblings
+      recentSiblingsRef.current = [
+        id,
+        ...recentSiblingsRef.current.filter((sid) => sid !== id),
+      ].slice(0, 5);
+    },
+    [noteId, organizeNote]
+  );
 
   const handleWikiLinkClick = useCallback(
     async (title: string) => {
@@ -183,6 +230,29 @@ export default function Home() {
         return;
       }
 
+      if (command.action === "ai:organize") {
+        if (!noteId) return;
+        setToast("Organizing...");
+        organizeNote(noteId).then((result) => {
+          if (result) {
+            loadNote(noteId);
+            const parts: string[] = [];
+            if (result.tagsAdded?.length) parts.push(`${result.tagsAdded.length} tags`);
+            if (result.linksAdded?.length) parts.push(`${result.linksAdded.length} links`);
+            if (result.peopleResolved?.length) parts.push(`${result.peopleResolved.length} people`);
+            setToast(parts.length > 0 ? `Added ${parts.join(", ")}` : "Already organized");
+          } else {
+            setToast("Organize failed");
+          }
+        });
+        return;
+      }
+
+      if (command.action === "org:people") {
+        setShowPeopleModal(true);
+        return;
+      }
+
       if (command.action === "ai:ask") {
         setShowAiPrompt(true);
         return;
@@ -190,7 +260,7 @@ export default function Home() {
 
       console.log("Unhandled command:", command.action);
     },
-    [loadNote]
+    [loadNote, noteId, organizeNote]
   );
 
   const handleAddTag = useCallback(
@@ -222,13 +292,53 @@ export default function Home() {
           : newContent.split("\n")[0]?.slice(0, 100) || "";
 
         const links = extractWikiLinks(newContent);
+        const tags = extractInlineTags(newContent);
 
         await fetch(`/api/notes/${noteId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, content: newContent, links }),
+          body: JSON.stringify({ title, content: newContent, links, tags }),
         });
       }, 500);
+    },
+    [noteId]
+  );
+
+  const handleClaudeCommand = useCallback(
+    async (instruction: string, cursorPosition: number) => {
+      if (!noteId) return;
+
+      const view = editorViewRef.current;
+      if (!view) return;
+
+      const doc = view.state.doc.toString();
+      const lineAt = view.state.doc.lineAt(cursorPosition);
+
+      const res = await fetch("/api/ai/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          instruction,
+          noteId,
+          noteContent: doc,
+          noteTitle: doc.match(/^#\s+(.+)$/m)?.[1] ?? "",
+          cursorPosition,
+        }),
+      });
+
+      if (!res.ok) {
+        const insertPos = lineAt.to;
+        view.dispatch({
+          changes: { from: insertPos, insert: "\n\u2717 command failed" },
+        });
+        return;
+      }
+
+      const { confirmation } = await res.json();
+      const insertPos = lineAt.to;
+      view.dispatch({
+        changes: { from: insertPos, insert: `\n\u2713 ${confirmation}` },
+      });
     },
     [noteId]
   );
@@ -287,6 +397,7 @@ export default function Home() {
           onChange={handleChange}
           onSlashCommand={handleSlashCommand}
           onWikiLinkClick={handleWikiLinkClick}
+          onClaudeCommand={handleClaudeCommand}
           editorViewRef={editorViewRef}
         />
       </div>
@@ -323,6 +434,15 @@ export default function Home() {
           position={tagInputPosition}
         />
       )}
+      {showPeopleModal && (
+        <PeopleModal
+          onSelectNote={(note) => {
+            setShowPeopleModal(false);
+            loadNote(note.id);
+          }}
+          onClose={() => setShowPeopleModal(false)}
+        />
+      )}
       {collectionModal && (
         <CollectionModal
           mode={collectionModal}
@@ -332,6 +452,9 @@ export default function Home() {
           }}
           onClose={() => setCollectionModal(null)}
         />
+      )}
+      {toast && (
+        <Toast message={toast} onDismiss={() => setToast(null)} />
       )}
     </main>
   );

@@ -11,6 +11,12 @@ export async function POST(request: NextRequest) {
 
 You have access to the user's vault through tools. Use them to answer questions about their notes.
 
+## Person notes
+Some notes have type "person" — these track people the user knows. Each person note has a name (the title), freeform observations (the content), and metadata (aliases, role). When the user asks you to "save this about [person]" or "note that [person] prefers X", use list_people to find the person, then update_note with append mode to add to their person note.
+
+## Tags
+Notes use inline #tags in their content. Tags are extracted automatically. When discussing notes, reference their tags.
+
 The user is currently editing a note with the following content:
 ---
 ${currentNoteContent || "(empty note)"}

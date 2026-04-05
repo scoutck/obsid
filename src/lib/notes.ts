@@ -15,6 +15,7 @@ interface UpdateNoteInput {
   tags?: string[];
   type?: string;
   links?: string[];
+  unresolvedPeople?: string[];
 }
 
 export async function createNote(input: CreateNoteInput): Promise<Note> {
@@ -46,6 +47,7 @@ export async function updateNote(
   if (input.tags !== undefined) data.tags = JSON.stringify(input.tags);
   if (input.type !== undefined) data.type = input.type;
   if (input.links !== undefined) data.links = JSON.stringify(input.links);
+  if (input.unresolvedPeople !== undefined) data.unresolvedPeople = JSON.stringify(input.unresolvedPeople);
 
   const raw = await prisma.note.update({ where: { id }, data });
   return parseNote(raw);
@@ -64,6 +66,7 @@ export async function listNotes(): Promise<Note[]> {
       tags: string;
       type: string;
       links: string;
+      unresolvedPeople: string;
       createdAt: string;
       updatedAt: string;
     }>
@@ -102,6 +105,7 @@ export async function searchNotes(query: string): Promise<Note[]> {
         tags: string;
         type: string;
         links: string;
+        unresolvedPeople: string;
         createdAt: string;
         updatedAt: string;
       }>
@@ -119,4 +123,14 @@ export async function searchNotes(query: string): Promise<Note[]> {
       })
     );
   }
+}
+
+export async function getRecentNotes(
+  ids: string[]
+): Promise<Note[]> {
+  if (ids.length === 0) return [];
+  const raw = await prisma.note.findMany({
+    where: { id: { in: ids } },
+  });
+  return raw.map(parseNote);
 }

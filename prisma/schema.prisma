@@ -7,14 +7,15 @@ datasource db {
 }
 
 model Note {
-  id        String   @id @default(uuid())
-  title     String   @default("")
-  content   String   @default("")
-  tags      String   @default("[]")
-  type      String   @default("")
-  links     String   @default("[]")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id @default(uuid())
+  title            String   @default("")
+  content          String   @default("")
+  tags             String   @default("[]")
+  type             String   @default("")
+  links            String   @default("[]")
+  unresolvedPeople String   @default("[]")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 model Collection {
@@ -22,4 +23,20 @@ model Collection {
   name      String
   filter    String
   createdAt DateTime @default(now())
+}
+
+model PersonMeta {
+  id        String   @id @default(uuid())
+  noteId    String   @unique
+  aliases   String   @default("[]")
+  role      String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model NotePerson {
+  noteId       String
+  personNoteId String
+
+  @@id([noteId, personNoteId])
 }

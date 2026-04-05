@@ -9,7 +9,9 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import { markdownPreview } from "@/editor/markdown-preview";
 import { wikiLinkDecorations } from "@/editor/wiki-links";
+import { tagSyntaxDecorations, claudeLineDecorations } from "@/editor/tag-syntax";
 import SlashMenu from "@/components/SlashMenu";
+import TagMenu from "@/components/TagMenu";
 import { type SlashCommand } from "@/editor/slash-commands";
 
 const theme = EditorView.theme({
@@ -62,6 +64,18 @@ const theme = EditorView.theme({
     fontFamily: "monospace",
     color: "#dc2626",
   },
+  ".cm-tag": {
+    color: "#6366f1",
+    fontWeight: "600",
+  },
+  ".cm-claude-line": {
+    color: "#a1a1aa",
+    fontStyle: "italic",
+  },
+  ".cm-claude-confirm": {
+    color: "#a1a1aa",
+    fontSize: "0.9em",
+  },
 });
 
 interface SlashMenuState {
@@ -76,10 +90,11 @@ interface EditorProps {
   onChange?: (content: string) => void;
   onSlashCommand?: (command: SlashCommand, view: EditorView) => void;
   onWikiLinkClick?: (title: string) => void;
+  onClaudeCommand?: (instruction: string, cursorPosition: number) => void;
   editorViewRef?: React.MutableRefObject<EditorView | null>;
 }
 
-export default function Editor({ initialContent = "", onChange, onSlashCommand, onWikiLinkClick, editorViewRef }: EditorProps) {
+export default function Editor({ initialContent = "", onChange, onSlashCommand, onWikiLinkClick, onClaudeCommand, editorViewRef }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const initialContentRef = useRef(initialContent);
@@ -93,12 +108,22 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
   const onWikiLinkClickRef = useRef(onWikiLinkClick);
   onWikiLinkClickRef.current = onWikiLinkClick;
 
+  const onClaudeCommandRef = useRef(onClaudeCommand);
+  onClaudeCommandRef.current = onClaudeCommand;
+
   const [slashMenu, setSlashMenu] = useState<SlashMenuState>({
     open: false,
     query: "",
     position: { top: 0, left: 0 },
     slashPos: -1,
   });
+
+  const [tagMenu, setTagMenu] = useState<{
+    open: boolean;
+    query: string;
+    position: { top: number; left: number };
+    hashPos: number;
+  }>({ open: false, query: "", position: { top: 0, left: 0 }, hashPos: -1 });
 
   const closeSlashMenu = useCallback(() => {
     setSlashMenu((prev) => ({ ...prev, open: false }));
@@ -126,18 +151,61 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
     });
   }, [slashMenu]);
 
+  const closeTagMenu = useCallback(() => {
+    setTagMenu((prev) => ({ ...prev, open: false }));
+  }, []);
+
+  const handleTagSelect = useCallback((tag: string) => {
+    const view = viewRef.current;
+    if (!view) return;
+
+    const { hashPos } = tagMenu;
+    if (hashPos >= 0) {
+      const cursorPos = view.state.selection.main.head;
+      view.dispatch({
+        changes: { from: hashPos, to: cursorPos, insert: `#${tag} ` },
+      });
+    }
+    setTagMenu((prev) => ({ ...prev, open: false }));
+    requestAnimationFrame(() => view.focus());
+  }, [tagMenu]);
+
   useEffect(() => {
     if (!containerRef.current) return;
 
     const state = EditorState.create({
       doc: initialContentRef.current,
       extensions: [
+        keymap.of([
+          {
+            key: "Enter",
+            run(view) {
+              const line = view.state.doc.lineAt(
+                view.state.selection.main.head
+              );
+              const match = line.text.match(/^\/claude\s+(.+)$/);
+              if (match) {
+                onClaudeCommandRef.current?.(match[1], line.from);
+                // Insert newline and move cursor to next line so user can keep typing
+                const insertPos = line.to;
+                view.dispatch({
+                  changes: { from: insertPos, insert: "\n" },
+                  selection: { anchor: insertPos + 1 },
+                });
+                return true;
+              }
+              return false;
+            },
+          },
+        ]),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         history(),
         markdown({ extensions: [GFM] }),
         syntaxHighlighting(defaultHighlightStyle),
         markdownPreview,
         wikiLinkDecorations,
+        tagSyntaxDecorations,
+        claudeLineDecorations,
         theme,
         EditorView.lineWrapping,
         EditorView.domEventHandlers({
@@ -165,6 +233,7 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
           const sel = update.state.selection.main;
           if (!sel.empty) {
             setSlashMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
+            setTagMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
             return;
           }
 
@@ -177,19 +246,46 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
 
           if (match) {
             const query = match[1];
-            const slashPos = cursorPos - match[0].length;
-            const coords = update.view.coordsAtPos(slashPos);
+            // Auto-dismiss slash menu when typing /claude command
+            if (query.startsWith("claude ")) {
+              setSlashMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
+            } else {
+              const slashPos = cursorPos - match[0].length;
+              const coords = update.view.coordsAtPos(slashPos);
 
-            if (coords) {
-              setSlashMenu({
-                open: true,
-                query,
-                position: { top: coords.bottom + 4, left: coords.left },
-                slashPos,
-              });
+              if (coords) {
+                setSlashMenu({
+                  open: true,
+                  query,
+                  position: { top: coords.bottom + 4, left: coords.left },
+                  slashPos,
+                });
+              }
             }
           } else {
             setSlashMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
+          }
+
+          // Detect #tag autocomplete trigger (only when slash menu is not open)
+          if (!match) {
+            const hashMatch = textBeforeCursor.match(/#([a-zA-Z][a-zA-Z0-9_-]*)$/);
+            if (hashMatch && !/^#{1,6}\s/.test(lineText)) {
+              const tagQuery = hashMatch[1];
+              const hashPos = cursorPos - hashMatch[0].length;
+              const coords = update.view.coordsAtPos(hashPos);
+              if (coords) {
+                setTagMenu({
+                  open: true,
+                  query: tagQuery,
+                  position: { top: coords.bottom + 4, left: coords.left },
+                  hashPos,
+                });
+              }
+            } else {
+              setTagMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
+            }
+          } else {
+            setTagMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
           }
         }),
       ],
@@ -233,6 +329,14 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
           position={slashMenu.position}
           onSelect={handleSlashSelect}
           onClose={closeSlashMenu}
+        />
+      )}
+      {tagMenu.open && (
+        <TagMenu
+          query={tagMenu.query}
+          position={tagMenu.position}
+          onSelect={handleTagSelect}
+          onClose={closeTagMenu}
         />
       )}
     </>

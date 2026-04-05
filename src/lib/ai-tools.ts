@@ -1,4 +1,5 @@
 import { searchNotes, getNote, createNote, updateNote } from "@/lib/notes";
+import { listPeople } from "@/lib/people";
 import type Anthropic from "@anthropic-ai/sdk";
 
 export const vaultTools: Anthropic.Tool[] = [
@@ -56,6 +57,16 @@ export const vaultTools: Anthropic.Tool[] = [
       required: ["id"],
     },
   },
+  {
+    name: "list_people",
+    description:
+      "List all known people in the vault with their aliases, roles, and the number of notes that mention them.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
 ];
 
 export async function executeTool(
@@ -99,6 +110,17 @@ export async function executeTool(
 
       const note = await updateNote(input.id as string, updates);
       return `Updated note "${note.title}" (id: ${note.id})`;
+    }
+
+    case "list_people": {
+      const people = await listPeople();
+      if (people.length === 0) return "No people tracked yet.";
+      return people
+        .map(
+          (p) =>
+            `- **${p.note.title}** (id: ${p.note.id})\n  Aliases: ${p.meta.aliases.join(", ")}\n  Role: ${p.meta.role || "unknown"}\n  Mentioned in: ${p.noteCount} notes`
+        )
+        .join("\n\n");
     }
 
     default:

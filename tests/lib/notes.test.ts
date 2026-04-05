@@ -5,7 +5,6 @@ import {
   updateNote,
   deleteNote,
   listNotes,
-  searchNotes,
 } from "@/lib/notes";
 import { prisma } from "@/lib/db";
 
