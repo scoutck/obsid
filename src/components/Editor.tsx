@@ -332,20 +332,21 @@ export default function Editor({ initialContent = "", initialCommands, onChange,
     } else {
       view.dispatch({ selection: { anchor: docLen } });
     }
-    // Initialize command widgets from saved commands
+    // Initialize command widgets from saved commands.
+    // Place at end of document — stored line numbers drift across sessions
+    // as the user edits content, so inline positioning would be unreliable.
     const cmds = initialCommandsRef.current;
     if (cmds && cmds.length > 0) {
-      const effects = cmds.map((cmd) => {
-        const safeLineNum = Math.min(cmd.line, view.state.doc.lines);
-        const pos = view.state.doc.line(safeLineNum).from;
-        return addCommandEffect.of({
+      const endPos = view.state.doc.length;
+      const effects = cmds.map((cmd) =>
+        addCommandEffect.of({
           id: cmd.id,
-          pos,
+          pos: endPos,
           instruction: cmd.instruction,
           confirmation: cmd.confirmation,
           status: cmd.status,
-        });
-      });
+        })
+      );
       view.dispatch({ effects });
     }
 
