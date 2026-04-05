@@ -2,6 +2,9 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Editor from "@/components/Editor";
+import { executeFormatting } from "@/editor/formatting";
+import type { SlashCommand } from "@/editor/slash-commands";
+import type { EditorView } from "@codemirror/view";
 
 export default function Home() {
   const [noteId, setNoteId] = useState<string | null>(null);
@@ -22,6 +25,17 @@ export default function Home() {
     }
     init();
   }, []);
+
+  const handleSlashCommand = useCallback(
+    (command: SlashCommand, view: EditorView) => {
+      if (command.action.startsWith("format:")) {
+        executeFormatting(view, command.action);
+        return;
+      }
+      console.log("Unhandled command:", command.action);
+    },
+    []
+  );
 
   // Auto-save with debounce
   const handleChange = useCallback(
@@ -56,7 +70,7 @@ export default function Home() {
 
   return (
     <main className="h-screen w-screen">
-      <Editor initialContent={content} onChange={handleChange} />
+      <Editor initialContent={content} onChange={handleChange} onSlashCommand={handleSlashCommand} />
     </main>
   );
 }
