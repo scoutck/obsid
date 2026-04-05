@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import Editor from "@/components/Editor";
 import NoteSearchModal from "@/components/NoteSearchModal";
 import { executeFormatting } from "@/editor/formatting";
+import { extractWikiLinks } from "@/editor/wiki-links";
 import type { SlashCommand } from "@/editor/slash-commands";
 import type { EditorView } from "@codemirror/view";
 import type { Note } from "@/types";
@@ -35,6 +36,29 @@ export default function Home() {
     setNoteId(note.id);
     setContent(note.content);
   }, []);
+
+  const handleWikiLinkClick = useCallback(
+    async (title: string) => {
+      const res = await fetch(`/api/notes?q=${encodeURIComponent(title)}`);
+      const notes: Note[] = await res.json();
+      const match = notes.find(
+        (n) => n.title.toLowerCase() === title.toLowerCase()
+      );
+      if (match) {
+        loadNote(match.id);
+      } else {
+        const createRes = await fetch("/api/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, content: `# ${title}\n\n` }),
+        });
+        const newNote = await createRes.json();
+        setNoteId(newNote.id);
+        setContent(newNote.content);
+      }
+    },
+    [loadNote]
+  );
 
   const handleSlashCommand = useCallback(
     (command: SlashCommand, view: EditorView) => {
@@ -90,6 +114,15 @@ export default function Home() {
         return;
       }
 
+      if (command.action === "org:wiki-link") {
+        const pos = view.state.selection.main.head;
+        view.dispatch({
+          changes: { from: pos, insert: "[[]]" },
+          selection: { anchor: pos + 2 },
+        });
+        return;
+      }
+
       console.log("Unhandled command:", command.action);
     },
     [loadNote]
@@ -108,10 +141,12 @@ export default function Home() {
           ? titleMatch[1]
           : newContent.split("\n")[0]?.slice(0, 100) || "";
 
+        const links = extractWikiLinks(newContent);
+
         await fetch(`/api/notes/${noteId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, content: newContent }),
+          body: JSON.stringify({ title, content: newContent, links }),
         });
       }, 500);
     },
@@ -133,6 +168,7 @@ export default function Home() {
         initialContent={content}
         onChange={handleChange}
         onSlashCommand={handleSlashCommand}
+        onWikiLinkClick={handleWikiLinkClick}
       />
       {showNoteSearch && (
         <NoteSearchModal

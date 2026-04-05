@@ -7,6 +7,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import { markdownPreview } from "@/editor/markdown-preview";
+import { wikiLinkDecorations } from "@/editor/wiki-links";
 import SlashMenu from "@/components/SlashMenu";
 import { type SlashCommand } from "@/editor/slash-commands";
 
@@ -63,9 +64,10 @@ interface EditorProps {
   initialContent?: string;
   onChange?: (content: string) => void;
   onSlashCommand?: (command: SlashCommand, view: EditorView) => void;
+  onWikiLinkClick?: (title: string) => void;
 }
 
-export default function Editor({ initialContent = "", onChange, onSlashCommand }: EditorProps) {
+export default function Editor({ initialContent = "", onChange, onSlashCommand, onWikiLinkClick }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 
@@ -74,6 +76,9 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand }
 
   const onSlashCommandRef = useRef(onSlashCommand);
   onSlashCommandRef.current = onSlashCommand;
+
+  const onWikiLinkClickRef = useRef(onWikiLinkClick);
+  onWikiLinkClickRef.current = onWikiLinkClick;
 
   const [slashMenu, setSlashMenu] = useState<SlashMenuState>({
     open: false,
@@ -114,8 +119,25 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand }
         markdown(),
         syntaxHighlighting(defaultHighlightStyle),
         markdownPreview,
+        wikiLinkDecorations,
         theme,
         EditorView.lineWrapping,
+        EditorView.domEventHandlers({
+          click(event, view) {
+            const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+            if (pos === null) return false;
+            const doc = view.state.doc.toString();
+            const regex = /\[\[([^\]]+)\]\]/g;
+            let match;
+            while ((match = regex.exec(doc)) !== null) {
+              if (pos >= match.index && pos <= match.index + match[0].length) {
+                onWikiLinkClickRef.current?.(match[1]);
+                return true;
+              }
+            }
+            return false;
+          },
+        }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             onChangeRef.current?.(update.state.doc.toString());

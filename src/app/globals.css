@@ -37,3 +37,16 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.15);
   margin: 1em 0;
 }
+
+/* Wiki-link styling */
+.cm-wiki-link {
+  color: #818cf8;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(129, 140, 248, 0.4);
+  text-underline-offset: 2px;
+}
+
+.cm-wiki-link:hover {
+  text-decoration-color: #818cf8;
+}
