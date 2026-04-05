@@ -9,6 +9,7 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import { markdownPreview } from "@/editor/markdown-preview";
 import { wikiLinkDecorations } from "@/editor/wiki-links";
+import { tagSyntaxDecorations } from "@/editor/tag-syntax";
 import SlashMenu from "@/components/SlashMenu";
 import { type SlashCommand } from "@/editor/slash-commands";
 
@@ -61,6 +62,10 @@ const theme = EditorView.theme({
     padding: "0 4px",
     fontFamily: "monospace",
     color: "#dc2626",
+  },
+  ".cm-tag": {
+    color: "#6366f1",
+    fontWeight: "600",
   },
 });
 
@@ -138,6 +143,7 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
         syntaxHighlighting(defaultHighlightStyle),
         markdownPreview,
         wikiLinkDecorations,
+        tagSyntaxDecorations,
         theme,
         EditorView.lineWrapping,
         EditorView.domEventHandlers({
