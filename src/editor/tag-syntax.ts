@@ -73,3 +73,40 @@ export const tagSyntaxDecorations = ViewPlugin.fromClass(
   },
   { decorations: (v) => v.decorations }
 );
+
+const claudeLineMark = Decoration.mark({ class: "cm-claude-line" });
+const claudeConfirmMark = Decoration.mark({ class: "cm-claude-confirm" });
+
+export const claudeLineDecorations = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = this.build(view);
+    }
+
+    update(update: { docChanged: boolean; view: EditorView }) {
+      if (update.docChanged) {
+        this.decorations = this.build(update.view);
+      }
+    }
+
+    build(view: EditorView): DecorationSet {
+      const builder = new RangeSetBuilder<Decoration>();
+      const doc = view.state.doc;
+
+      for (let i = 1; i <= doc.lines; i++) {
+        const line = doc.line(i);
+        const trimmed = line.text.trimStart();
+        if (trimmed.startsWith("/claude ")) {
+          builder.add(line.from, line.to, claudeLineMark);
+        } else if (trimmed.startsWith("\u2713 ") || trimmed.startsWith("\u2717 ")) {
+          builder.add(line.from, line.to, claudeConfirmMark);
+        }
+      }
+
+      return builder.finish();
+    }
+  },
+  { decorations: (v) => v.decorations }
+);
