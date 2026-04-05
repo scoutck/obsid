@@ -107,12 +107,18 @@ Return JSON in this exact format:
   "tagCorrections": [{"from": "misspelled-tag", "to": "correct-tag"}]
 }`;
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 1024,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
-  });
+  let response;
+  try {
+    response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+  } catch (err) {
+    console.error("[organize] AI request failed:", err);
+    return Response.json({ error: "AI request failed" }, { status: 502 });
+  }
 
   let resultText = "";
   for (const block of response.content) {
@@ -123,6 +129,7 @@ Return JSON in this exact format:
   try {
     result = JSON.parse(resultText);
   } catch {
+    console.error("[organize] Failed to parse AI response:", resultText.slice(0, 200));
     return Response.json({ error: "Failed to parse AI response" }, { status: 500 });
   }
 

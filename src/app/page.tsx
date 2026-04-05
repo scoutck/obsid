@@ -36,6 +36,8 @@ export default function Home() {
   const editorViewRef = useRef<EditorView | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const recentSiblingsRef = useRef<string[]>([]);
+  const organizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const organizeInFlightRef = useRef<Set<string>>(new Set());
 
   // Load most recent note or create a welcome note on first launch
   useEffect(() => {
@@ -72,6 +74,10 @@ export default function Home() {
 
   const organizeNote = useCallback(
     async (id: string) => {
+      // Deduplication: skip if already in-flight for this note
+      if (organizeInFlightRef.current.has(id)) return null;
+      organizeInFlightRef.current.add(id);
+
       try {
         const organizeRes = await fetch("/api/ai/organize", {
           method: "POST",
@@ -86,6 +92,8 @@ export default function Home() {
         return organizeRes.json();
       } catch {
         return null;
+      } finally {
+        organizeInFlightRef.current.delete(id);
       }
     },
     []
@@ -93,9 +101,18 @@ export default function Home() {
 
   const loadNote = useCallback(
     async (id: string) => {
-      // Organize previous note in background (fire-and-forget)
+      // Cancel any pending debounced organize from previous navigation
+      if (organizeTimeoutRef.current) {
+        clearTimeout(organizeTimeoutRef.current);
+        organizeTimeoutRef.current = null;
+      }
+
+      // Organize previous note in background with 2s debounce
       if (noteId && noteId !== id) {
-        organizeNote(noteId);
+        const prevId = noteId;
+        organizeTimeoutRef.current = setTimeout(() => {
+          organizeNote(prevId);
+        }, 2000);
       }
 
       const res = await fetch(`/api/notes/${id}`);
