@@ -1,8 +1,7 @@
 /**
  * Extract inline #tag patterns from markdown content.
  *
- * Ignores tags inside code blocks, inline code, heading lines,
- * /claude command lines, and confirmation lines (✓/✗).
+ * Ignores tags inside code blocks, inline code, and heading lines.
  * Skips mid-word hashes (e.g. C#).
  * Tags must start with a letter and can contain alphanumeric, hyphens, underscores.
  * Returns a deduplicated array.
@@ -26,12 +25,6 @@ export function extractInlineTags(content: string): string[] {
 
     // Skip heading lines (# followed by space)
     if (/^#{1,6}\s/.test(trimmed)) continue;
-
-    // Skip /claude command lines
-    if (trimmed.startsWith("/claude")) continue;
-
-    // Skip confirmation lines (✓ or ✗)
-    if (trimmed.startsWith("\u2713") || trimmed.startsWith("\u2717")) continue;
 
     // Match #tag at start of line or after whitespace
     // Tag must start with a letter, can contain alphanumeric, hyphens, underscores

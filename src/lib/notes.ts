@@ -53,6 +53,47 @@ export async function updateNote(
   return parseNote(raw);
 }
 
+/**
+ * Atomically update a note only if updatedAt matches the expected value.
+ * Returns true if the update succeeded, false if the note was modified
+ * since the snapshot (stale).
+ */
+export async function conditionalUpdateNote(
+  id: string,
+  expectedUpdatedAt: Date,
+  input: UpdateNoteInput
+): Promise<boolean> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+
+  if (input.content !== undefined) {
+    sets.push(`content = ?`);
+    params.push(input.content);
+  }
+  if (input.tags !== undefined) {
+    sets.push(`tags = ?`);
+    params.push(JSON.stringify(input.tags));
+  }
+  if (input.unresolvedPeople !== undefined) {
+    sets.push(`"unresolvedPeople" = ?`);
+    params.push(JSON.stringify(input.unresolvedPeople));
+  }
+
+  if (sets.length === 0) return true;
+
+  // Use ISO string (not CURRENT_TIMESTAMP) to match Prisma's format
+  sets.push(`"updatedAt" = ?`);
+  params.push(new Date().toISOString());
+  params.push(id, expectedUpdatedAt.toISOString());
+
+  const result = await prisma.$executeRawUnsafe(
+    `UPDATE "Note" SET ${sets.join(", ")} WHERE id = ? AND "updatedAt" = ?`,
+    ...params
+  );
+
+  return result > 0;
+}
+
 export async function deleteNote(id: string): Promise<void> {
   await prisma.note.delete({ where: { id } });
 }
@@ -71,6 +112,43 @@ export async function listNotes(): Promise<Note[]> {
       updatedAt: string;
     }>
   >(`SELECT * FROM "Note" ORDER BY updatedAt DESC, rowid DESC`);
+  return raw.map((r) =>
+    parseNote({
+      ...r,
+      createdAt: new Date(r.createdAt),
+      updatedAt: new Date(r.updatedAt),
+    })
+  );
+}
+
+/**
+ * Fetch the most recent notes for organize context, filtered at the SQL level.
+ * Excludes the given note and any person notes (by noteId set).
+ */
+export async function listContextNotes(
+  excludeNoteId: string,
+  personNoteIds: string[],
+  limit: number = 100
+): Promise<Note[]> {
+  const excludeIds = [excludeNoteId, ...personNoteIds];
+  const placeholders = excludeIds.map(() => "?").join(", ");
+  const raw = await prisma.$queryRawUnsafe<
+    Array<{
+      id: string;
+      title: string;
+      content: string;
+      tags: string;
+      type: string;
+      links: string;
+      unresolvedPeople: string;
+      createdAt: string;
+      updatedAt: string;
+    }>
+  >(
+    `SELECT * FROM "Note" WHERE id NOT IN (${placeholders}) ORDER BY updatedAt DESC, rowid DESC LIMIT ?`,
+    ...excludeIds,
+    limit
+  );
   return raw.map((r) =>
     parseNote({
       ...r,

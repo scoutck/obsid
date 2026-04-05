@@ -12,15 +12,17 @@ import Toast from "@/components/Toast";
 import { executeFormatting } from "@/editor/formatting";
 import { extractWikiLinks } from "@/editor/wiki-links";
 import { extractInlineTags } from "@/lib/extract-tags";
+import { updateCommandEffect } from "@/editor/command-widgets";
 import type { SlashCommand } from "@/editor/slash-commands";
 import type { EditorView } from "@codemirror/view";
-import type { Note } from "@/types";
+import type { Note, CommandData } from "@/types";
 
 export default function Home() {
   const [noteId, setNoteId] = useState<string | null>(null);
   const [content, setContent] = useState("");
   const contentRef = useRef("");
   const [noteTags, setNoteTags] = useState<string[]>([]);
+  const [noteCommands, setNoteCommands] = useState<CommandData[]>([]);
   const [showNoteSearch, setShowNoteSearch] = useState(false);
   const [showTagInput, setShowTagInput] = useState(false);
   const [tagInputPosition, setTagInputPosition] = useState({ top: 0, left: 0 });
@@ -36,6 +38,8 @@ export default function Home() {
   const editorViewRef = useRef<EditorView | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const recentSiblingsRef = useRef<string[]>([]);
+  const organizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const organizeInFlightRef = useRef<Set<string>>(new Set());
 
   // Load most recent note or create a welcome note on first launch
   useEffect(() => {
@@ -72,18 +76,16 @@ export default function Home() {
 
   const organizeNote = useCallback(
     async (id: string) => {
-      try {
-        const res = await fetch(`/api/notes/${id}`);
-        if (!res.ok) return null;
-        const note = await res.json();
+      // Deduplication: skip if already in-flight for this note
+      if (organizeInFlightRef.current.has(id)) return null;
+      organizeInFlightRef.current.add(id);
 
+      try {
         const organizeRes = await fetch("/api/ai/organize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             noteId: id,
-            title: note.title,
-            content: note.content,
             recentSiblingIds: recentSiblingsRef.current.filter((sid) => sid !== id),
           }),
         });
@@ -92,6 +94,8 @@ export default function Home() {
         return organizeRes.json();
       } catch {
         return null;
+      } finally {
+        organizeInFlightRef.current.delete(id);
       }
     },
     []
@@ -99,16 +103,30 @@ export default function Home() {
 
   const loadNote = useCallback(
     async (id: string) => {
-      // Organize previous note in background (fire-and-forget)
-      if (noteId && noteId !== id) {
-        organizeNote(noteId);
+      // Cancel any pending debounced organize from previous navigation
+      if (organizeTimeoutRef.current) {
+        clearTimeout(organizeTimeoutRef.current);
+        organizeTimeoutRef.current = null;
       }
 
-      const res = await fetch(`/api/notes/${id}`);
-      const note = await res.json();
+      // Organize previous note in background with 2s debounce
+      if (noteId && noteId !== id) {
+        const prevId = noteId;
+        organizeTimeoutRef.current = setTimeout(() => {
+          organizeNote(prevId);
+        }, 2000);
+      }
+
+      const [noteRes, cmdsRes] = await Promise.all([
+        fetch(`/api/notes/${id}`),
+        fetch(`/api/notes/${id}/commands`),
+      ]);
+      const note = await noteRes.json();
+      const cmds: CommandData[] = await cmdsRes.json();
       setNoteId(note.id);
       setContent(note.content);
       setNoteTags(note.tags || []);
+      setNoteCommands(cmds);
 
       // Track recent siblings
       recentSiblingsRef.current = [
@@ -234,16 +252,20 @@ export default function Home() {
         if (!noteId) return;
         setToast("Organizing...");
         organizeNote(noteId).then((result) => {
-          if (result) {
-            loadNote(noteId);
-            const parts: string[] = [];
-            if (result.tagsAdded?.length) parts.push(`${result.tagsAdded.length} tags`);
-            if (result.linksAdded?.length) parts.push(`${result.linksAdded.length} links`);
-            if (result.peopleResolved?.length) parts.push(`${result.peopleResolved.length} people`);
-            setToast(parts.length > 0 ? `Added ${parts.join(", ")}` : "Already organized");
-          } else {
+          if (!result) {
             setToast("Organize failed");
+            return;
           }
+          if (result.stale) {
+            setToast("Note changed — organize skipped");
+            return;
+          }
+          loadNote(noteId);
+          const parts: string[] = [];
+          if (result.tagsAdded?.length) parts.push(`${result.tagsAdded.length} tags`);
+          if (result.linksAdded?.length) parts.push(`${result.linksAdded.length} links`);
+          if (result.peopleResolved?.length) parts.push(`${result.peopleResolved.length} people`);
+          setToast(parts.length > 0 ? `Added ${parts.join(", ")}` : "Already organized");
         });
         return;
       }
@@ -305,14 +327,15 @@ export default function Home() {
   );
 
   const handleClaudeCommand = useCallback(
-    async (instruction: string, cursorPosition: number) => {
+    async (instruction: string, commandId: string, line: number) => {
       if (!noteId) return;
 
       const view = editorViewRef.current;
       if (!view) return;
 
       const doc = view.state.doc.toString();
-      const lineAt = view.state.doc.lineAt(cursorPosition);
+      const safeLineNum = Math.min(line, view.state.doc.lines);
+      const cursorPosition = view.state.doc.line(safeLineNum).from;
 
       const res = await fetch("/api/ai/command", {
         method: "POST",
@@ -323,21 +346,28 @@ export default function Home() {
           noteContent: doc,
           noteTitle: doc.match(/^#\s+(.+)$/m)?.[1] ?? "",
           cursorPosition,
+          line,
         }),
       });
 
       if (!res.ok) {
-        const insertPos = lineAt.to;
         view.dispatch({
-          changes: { from: insertPos, insert: "\n\u2717 command failed" },
+          effects: updateCommandEffect.of({
+            id: commandId,
+            confirmation: "command failed",
+            status: "error",
+          }),
         });
         return;
       }
 
-      const { confirmation } = await res.json();
-      const insertPos = lineAt.to;
+      const result = await res.json();
       view.dispatch({
-        changes: { from: insertPos, insert: `\n\u2713 ${confirmation}` },
+        effects: updateCommandEffect.of({
+          id: commandId,
+          confirmation: result.confirmation,
+          status: "done",
+        }),
       });
     },
     [noteId]
@@ -394,6 +424,7 @@ export default function Home() {
         <Editor
           key={noteId}
           initialContent={content}
+          initialCommands={noteCommands}
           onChange={handleChange}
           onSlashCommand={handleSlashCommand}
           onWikiLinkClick={handleWikiLinkClick}

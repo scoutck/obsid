@@ -44,7 +44,7 @@ describe("extractInlineTags", () => {
     expect(tags).toEqual([]);
   });
 
-  it("ignores /claude and confirmation lines", () => {
+  it("does not extract tags from lines without hash patterns", () => {
     const tags = extractInlineTags(
       "#real-tag\n/claude flag this\n\u2713 saved to note\n\u2717 failed"
     );

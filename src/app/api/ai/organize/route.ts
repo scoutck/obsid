@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { updateNote, getRecentNotes, listNotes } from "@/lib/notes";
+import { getNote, conditionalUpdateNote, getRecentNotes, listContextNotes } from "@/lib/notes";
 import { getTagVocabulary, extractInlineTags } from "@/lib/tags";
 import {
   listPeople,
@@ -21,12 +21,19 @@ interface OrganizeResult {
 }
 
 export async function POST(request: NextRequest) {
-  const { noteId, title, content, recentSiblingIds } = await request.json();
+  const { noteId, recentSiblingIds } = await request.json();
+
+  // Fetch note and snapshot updatedAt for staleness detection
+  const note = await getNote(noteId);
+  if (!note) {
+    return Response.json({ error: "Note not found" }, { status: 404 });
+  }
+  const snapshotUpdatedAt = note.updatedAt.getTime();
+  const { title, content } = note;
 
   // Gather vault context
-  const [tagVocab, allNotes, recentSiblings, people] = await Promise.all([
+  const [tagVocab, recentSiblings, people] = await Promise.all([
     getTagVocabulary(),
-    listNotes(),
     getRecentNotes(recentSiblingIds ?? []),
     listPeople(),
   ]);
@@ -34,8 +41,12 @@ export async function POST(request: NextRequest) {
   const existingTags = extractInlineTags(content);
   const existingLinks = extractWikiLinks(content);
 
-  const noteTitles = allNotes
-    .slice(0, 100)
+  // Context: 100 most recently edited notes, excluding this note and person notes.
+  // Filtered and limited at SQL level for efficiency.
+  const personNoteIds = people.map((p) => p.meta.noteId);
+  const contextNotes = await listContextNotes(noteId, personNoteIds);
+
+  const noteTitles = contextNotes
     .map((n) => `- ${n.title || "Untitled"}: ${n.content.slice(0, 100)}`)
     .join("\n");
 
@@ -99,12 +110,18 @@ Return JSON in this exact format:
   "tagCorrections": [{"from": "misspelled-tag", "to": "correct-tag"}]
 }`;
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 1024,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
-  });
+  let response;
+  try {
+    response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+  } catch (err) {
+    console.error("[organize] AI request failed:", err);
+    return Response.json({ error: "AI request failed" }, { status: 502 });
+  }
 
   let resultText = "";
   for (const block of response.content) {
@@ -115,6 +132,7 @@ Return JSON in this exact format:
   try {
     result = JSON.parse(resultText);
   } catch {
+    console.error("[organize] Failed to parse AI response:", resultText.slice(0, 200));
     return Response.json({ error: "Failed to parse AI response" }, { status: 500 });
   }
 
@@ -178,11 +196,20 @@ Return JSON in this exact format:
   // Compute final tags from updated content
   const finalTags = extractInlineTags(updatedContent);
 
-  await updateNote(noteId, {
-    content: updatedContent,
-    tags: finalTags,
-    unresolvedPeople: result.unresolvedPeople,
-  });
+  // Atomic conditional update: only writes if updatedAt hasn't changed
+  const updated = await conditionalUpdateNote(
+    noteId,
+    new Date(snapshotUpdatedAt),
+    {
+      content: updatedContent,
+      tags: finalTags,
+      unresolvedPeople: result.unresolvedPeople,
+    }
+  );
+
+  if (!updated) {
+    return Response.json({ stale: true });
+  }
 
   return Response.json({
     tagsAdded: result.tags.filter((t) => !existingTags.includes(t)),
