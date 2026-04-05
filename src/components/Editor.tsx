@@ -17,6 +17,7 @@ import {
 import SlashMenu from "@/components/SlashMenu";
 import TagMenu from "@/components/TagMenu";
 import { type SlashCommand } from "@/editor/slash-commands";
+import type { CommandData } from "@/types";
 
 const theme = EditorView.theme({
   "&": {
@@ -87,14 +88,6 @@ interface SlashMenuState {
   query: string;
   position: { top: number; left: number };
   slashPos: number;
-}
-
-interface CommandData {
-  id: string;
-  line: number;
-  instruction: string;
-  confirmation: string;
-  status: string;
 }
 
 interface EditorProps {

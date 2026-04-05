@@ -1,3 +1,11 @@
+export interface CommandData {
+  id: string;
+  line: number;
+  instruction: string;
+  confirmation: string;
+  status: string;
+}
+
 export interface Note {
   id: string;
   title: string;

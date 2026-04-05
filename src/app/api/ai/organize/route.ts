@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { getNote, updateNote, getRecentNotes, listNotes } from "@/lib/notes";
+import { getNote, conditionalUpdateNote, getRecentNotes, listNotes } from "@/lib/notes";
 import { getTagVocabulary, extractInlineTags } from "@/lib/tags";
 import {
   listPeople,
@@ -196,20 +196,23 @@ Return JSON in this exact format:
     }
   }
 
-  // Staleness check: if the note was modified while AI was processing, discard
-  const currentNote = await getNote(noteId);
-  if (!currentNote || currentNote.updatedAt.getTime() !== snapshotUpdatedAt) {
-    return Response.json({ stale: true });
-  }
-
   // Compute final tags from updated content
   const finalTags = extractInlineTags(updatedContent);
 
-  await updateNote(noteId, {
-    content: updatedContent,
-    tags: finalTags,
-    unresolvedPeople: result.unresolvedPeople,
-  });
+  // Atomic conditional update: only writes if updatedAt hasn't changed
+  const updated = await conditionalUpdateNote(
+    noteId,
+    new Date(snapshotUpdatedAt),
+    {
+      content: updatedContent,
+      tags: finalTags,
+      unresolvedPeople: result.unresolvedPeople,
+    }
+  );
+
+  if (!updated) {
+    return Response.json({ stale: true });
+  }
 
   return Response.json({
     tagsAdded: result.tags.filter((t) => !existingTags.includes(t)),

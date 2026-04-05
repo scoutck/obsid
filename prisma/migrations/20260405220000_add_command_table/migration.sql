@@ -8,3 +8,6 @@ CREATE TABLE "Command" (
     "status" TEXT NOT NULL DEFAULT 'pending',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- CreateIndex
+CREATE INDEX "Command_noteId_idx" ON "Command"("noteId");

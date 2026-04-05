@@ -15,15 +15,7 @@ import { extractInlineTags } from "@/lib/extract-tags";
 import { updateCommandEffect } from "@/editor/command-widgets";
 import type { SlashCommand } from "@/editor/slash-commands";
 import type { EditorView } from "@codemirror/view";
-import type { Note } from "@/types";
-
-interface CommandData {
-  id: string;
-  line: number;
-  instruction: string;
-  confirmation: string;
-  status: string;
-}
+import type { Note, CommandData } from "@/types";
 
 export default function Home() {
   const [noteId, setNoteId] = useState<string | null>(null);

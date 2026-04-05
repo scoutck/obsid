@@ -46,35 +46,8 @@ You have tools to search, read, create, and update notes. Execute the user's ins
     instruction,
   });
 
-  let response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 1024,
-    system: systemPrompt,
-    tools: vaultTools,
-    messages,
-  });
-
-  while (response.stop_reason === "tool_use") {
-    const assistantContent = response.content;
-    messages.push({ role: "assistant", content: assistantContent });
-
-    const toolResults: Anthropic.ToolResultBlockParam[] = [];
-    for (const block of assistantContent) {
-      if (block.type === "tool_use") {
-        const result = await executeTool(
-          block.name,
-          block.input as Record<string, unknown>
-        );
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: block.id,
-          content: result,
-        });
-      }
-    }
-
-    messages.push({ role: "user", content: toolResults });
-
+  let response;
+  try {
     response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1024,
@@ -82,6 +55,43 @@ You have tools to search, read, create, and update notes. Execute the user's ins
       tools: vaultTools,
       messages,
     });
+
+    while (response.stop_reason === "tool_use") {
+      const assistantContent = response.content;
+      messages.push({ role: "assistant", content: assistantContent });
+
+      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+      for (const block of assistantContent) {
+        if (block.type === "tool_use") {
+          const result = await executeTool(
+            block.name,
+            block.input as Record<string, unknown>
+          );
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: block.id,
+            content: result,
+          });
+        }
+      }
+
+      messages.push({ role: "user", content: toolResults });
+
+      response = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1024,
+        system: systemPrompt,
+        tools: vaultTools,
+        messages,
+      });
+    }
+  } catch (err) {
+    console.error("[command] AI request failed:", err);
+    await updateCommand(command.id, {
+      confirmation: "AI request failed",
+      status: "error",
+    });
+    return Response.json({ error: "AI request failed" }, { status: 502 });
   }
 
   let finalText = "";

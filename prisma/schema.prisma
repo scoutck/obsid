@@ -49,4 +49,6 @@ model Command {
   confirmation String   @default("")
   status       String   @default("pending")
   createdAt    DateTime @default(now())
+
+  @@index([noteId])
 }

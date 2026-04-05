@@ -53,6 +53,45 @@ export async function updateNote(
   return parseNote(raw);
 }
 
+/**
+ * Atomically update a note only if updatedAt matches the expected value.
+ * Returns true if the update succeeded, false if the note was modified
+ * since the snapshot (stale).
+ */
+export async function conditionalUpdateNote(
+  id: string,
+  expectedUpdatedAt: Date,
+  input: UpdateNoteInput
+): Promise<boolean> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+
+  if (input.content !== undefined) {
+    sets.push(`content = ?`);
+    params.push(input.content);
+  }
+  if (input.tags !== undefined) {
+    sets.push(`tags = ?`);
+    params.push(JSON.stringify(input.tags));
+  }
+  if (input.unresolvedPeople !== undefined) {
+    sets.push(`"unresolvedPeople" = ?`);
+    params.push(JSON.stringify(input.unresolvedPeople));
+  }
+
+  if (sets.length === 0) return true;
+
+  sets.push(`"updatedAt" = CURRENT_TIMESTAMP`);
+  params.push(id, expectedUpdatedAt.toISOString());
+
+  const result = await prisma.$executeRawUnsafe(
+    `UPDATE "Note" SET ${sets.join(", ")} WHERE id = ? AND "updatedAt" = ?`,
+    ...params
+  );
+
+  return result > 0;
+}
+
 export async function deleteNote(id: string): Promise<void> {
   await prisma.note.delete({ where: { id } });
 }
