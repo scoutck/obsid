@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getNote, updateNote, deleteNote } from "@/lib/notes";
+import { deleteCommandsForNote } from "@/lib/commands";
 
 export async function GET(
   _request: NextRequest,
@@ -28,6 +29,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  await deleteCommandsForNote(id);
   await deleteNote(id);
   return NextResponse.json({ success: true });
 }
