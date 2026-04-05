@@ -8,6 +8,11 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: [],
+    globalSetup: ["./tests/setup.ts"],
+    fileParallelism: false,
+    env: {
+      DATABASE_URL: "file:./prisma/test.db",
+    },
   },
   resolve: {
     alias: {

@@ -30,13 +30,31 @@ export default function Home() {
   const editorViewRef = useRef<EditorView | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Create a new note on first load
+  // Load most recent note or create a welcome note on first launch
   useEffect(() => {
     async function init() {
+      // Check for existing notes first
+      const listRes = await fetch("/api/notes");
+      const existingNotes = await listRes.json();
+
+      if (existingNotes.length > 0) {
+        // Open most recent note
+        const latest = existingNotes[0];
+        setNoteId(latest.id);
+        setContent(latest.content);
+        setNoteTags(latest.tags || []);
+        return;
+      }
+
+      // Create welcome note
       const res = await fetch("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          title: "Welcome to Obsid",
+          content: "# Welcome to Obsid\n\nType `/` to open the command menu.\n\nTry creating a new note, adding tags, or asking Claude a question.\n",
+          type: "welcome",
+        }),
       });
       const note = await res.json();
       setNoteId(note.id);
