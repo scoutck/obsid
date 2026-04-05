@@ -292,6 +292,45 @@ export default function Home() {
     [noteId]
   );
 
+  const handleClaudeCommand = useCallback(
+    async (instruction: string, cursorPosition: number) => {
+      if (!noteId) return;
+
+      const view = editorViewRef.current;
+      if (!view) return;
+
+      const doc = view.state.doc.toString();
+      const lineAt = view.state.doc.lineAt(cursorPosition);
+
+      const res = await fetch("/api/ai/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          instruction,
+          noteId,
+          noteContent: doc,
+          noteTitle: doc.match(/^#\s+(.+)$/m)?.[1] ?? "",
+          cursorPosition,
+        }),
+      });
+
+      if (!res.ok) {
+        const insertPos = lineAt.to;
+        view.dispatch({
+          changes: { from: insertPos, insert: "\n\u2717 command failed" },
+        });
+        return;
+      }
+
+      const { confirmation } = await res.json();
+      const insertPos = lineAt.to;
+      view.dispatch({
+        changes: { from: insertPos, insert: `\n\u2713 ${confirmation}` },
+      });
+    },
+    [noteId]
+  );
+
   const handleAiSubmit = useCallback(
     async (prompt: string) => {
       setShowAiPrompt(false);
@@ -346,6 +385,7 @@ export default function Home() {
           onChange={handleChange}
           onSlashCommand={handleSlashCommand}
           onWikiLinkClick={handleWikiLinkClick}
+          onClaudeCommand={handleClaudeCommand}
           editorViewRef={editorViewRef}
         />
       </div>

@@ -82,10 +82,11 @@ interface EditorProps {
   onChange?: (content: string) => void;
   onSlashCommand?: (command: SlashCommand, view: EditorView) => void;
   onWikiLinkClick?: (title: string) => void;
+  onClaudeCommand?: (instruction: string, cursorPosition: number) => void;
   editorViewRef?: React.MutableRefObject<EditorView | null>;
 }
 
-export default function Editor({ initialContent = "", onChange, onSlashCommand, onWikiLinkClick, editorViewRef }: EditorProps) {
+export default function Editor({ initialContent = "", onChange, onSlashCommand, onWikiLinkClick, onClaudeCommand, editorViewRef }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const initialContentRef = useRef(initialContent);
@@ -98,6 +99,9 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
 
   const onWikiLinkClickRef = useRef(onWikiLinkClick);
   onWikiLinkClickRef.current = onWikiLinkClick;
+
+  const onClaudeCommandRef = useRef(onClaudeCommand);
+  onClaudeCommandRef.current = onClaudeCommand;
 
   const [slashMenu, setSlashMenu] = useState<SlashMenuState>({
     open: false,
@@ -164,6 +168,22 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
     const state = EditorState.create({
       doc: initialContentRef.current,
       extensions: [
+        keymap.of([
+          {
+            key: "Enter",
+            run(view) {
+              const line = view.state.doc.lineAt(
+                view.state.selection.main.head
+              );
+              const match = line.text.match(/^\/claude\s+(.+)$/);
+              if (match) {
+                onClaudeCommandRef.current?.(match[1], line.from);
+                return true; // Prevent default Enter (new line)
+              }
+              return false; // Let default Enter happen
+            },
+          },
+        ]),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         history(),
         markdown({ extensions: [GFM] }),
@@ -211,16 +231,21 @@ export default function Editor({ initialContent = "", onChange, onSlashCommand, 
 
           if (match) {
             const query = match[1];
-            const slashPos = cursorPos - match[0].length;
-            const coords = update.view.coordsAtPos(slashPos);
+            // Auto-dismiss slash menu when typing /claude command
+            if (query.startsWith("claude ")) {
+              setSlashMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
+            } else {
+              const slashPos = cursorPos - match[0].length;
+              const coords = update.view.coordsAtPos(slashPos);
 
-            if (coords) {
-              setSlashMenu({
-                open: true,
-                query,
-                position: { top: coords.bottom + 4, left: coords.left },
-                slashPos,
-              });
+              if (coords) {
+                setSlashMenu({
+                  open: true,
+                  query,
+                  position: { top: coords.bottom + 4, left: coords.left },
+                  slashPos,
+                });
+              }
             }
           } else {
             setSlashMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
