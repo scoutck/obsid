@@ -30,3 +30,10 @@ body {
 .cm-editor.cm-focused {
   outline: none;
 }
+
+/* Horizontal rule in editor */
+.cm-hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  margin: 1em 0;
+}
