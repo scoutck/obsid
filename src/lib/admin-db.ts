@@ -13,8 +13,17 @@ const globalForAdmin = globalThis as unknown as {
   adminPrisma: PrismaClient | undefined;
 };
 
-export const adminPrisma =
-  globalForAdmin.adminPrisma ?? createAdminClient();
+// Lazy initialization — avoids throwing during Next.js build when env vars aren't set
+export function getAdminPrisma(): PrismaClient {
+  if (!globalForAdmin.adminPrisma) {
+    globalForAdmin.adminPrisma = createAdminClient();
+  }
+  return globalForAdmin.adminPrisma;
+}
 
-if (process.env.NODE_ENV !== "production")
-  globalForAdmin.adminPrisma = adminPrisma;
+// Proxy that defers client creation until first property access
+export const adminPrisma = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    return (getAdminPrisma() as unknown as Record<string | symbol, unknown>)[prop];
+  },
+});
