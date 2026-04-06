@@ -6,6 +6,7 @@ interface CreatePersonInput {
   aliases?: string[];
   role?: string;
   content?: string;
+  userContext?: string;
 }
 
 interface UpdatePersonInput {
@@ -45,6 +46,7 @@ export async function createPerson(
       noteId: note.id,
       aliases: JSON.stringify(uniqueAliases),
       role: input.role ?? "",
+      userContext: input.userContext ?? "",
     },
   });
   const meta = parsePersonMeta(rawMeta);
@@ -189,4 +191,14 @@ export async function getNotesMentioning(
   }
 
   return notes;
+}
+
+export async function updatePersonSummary(
+  noteId: string,
+  summary: string
+): Promise<void> {
+  await prisma.personMeta.update({
+    where: { noteId },
+    data: { summary },
+  });
 }

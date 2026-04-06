@@ -15,7 +15,6 @@ interface UpdateNoteInput {
   tags?: string[];
   type?: string;
   links?: string[];
-  unresolvedPeople?: string[];
 }
 
 export async function createNote(input: CreateNoteInput): Promise<Note> {
@@ -47,7 +46,6 @@ export async function updateNote(
   if (input.tags !== undefined) data.tags = JSON.stringify(input.tags);
   if (input.type !== undefined) data.type = input.type;
   if (input.links !== undefined) data.links = JSON.stringify(input.links);
-  if (input.unresolvedPeople !== undefined) data.unresolvedPeople = JSON.stringify(input.unresolvedPeople);
 
   const raw = await prisma.note.update({ where: { id }, data });
   return parseNote(raw);
@@ -73,10 +71,6 @@ export async function conditionalUpdateNote(
   if (input.tags !== undefined) {
     sets.push(`tags = ?`);
     params.push(JSON.stringify(input.tags));
-  }
-  if (input.unresolvedPeople !== undefined) {
-    sets.push(`"unresolvedPeople" = ?`);
-    params.push(JSON.stringify(input.unresolvedPeople));
   }
 
   if (sets.length === 0) return true;

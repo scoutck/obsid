@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getNote, updateNote, deleteNote } from "@/lib/notes";
 import { deleteCommandsForNote } from "@/lib/commands";
+import { embedNote } from "@/lib/embeddings";
+import { prisma } from "@/lib/db";
 
 export async function GET(
   _request: NextRequest,
@@ -21,6 +23,12 @@ export async function PUT(
   const { id } = await params;
   const body = await request.json();
   const note = await updateNote(id, body);
+
+  // Fire-and-forget embedding
+  embedNote(note.id, note.title, note.content).catch((err) =>
+    console.error("[embed] Background embed failed:", err)
+  );
+
   return NextResponse.json(note);
 }
 
@@ -30,6 +38,12 @@ export async function DELETE(
 ) {
   const { id } = await params;
   await deleteCommandsForNote(id);
+  await prisma.embedding.deleteMany({ where: { noteId: id } });
+  await prisma.notePerson.deleteMany({ where: { noteId: id } });
+  await prisma.pendingPerson.updateMany({
+    where: { sourceNoteId: id },
+    data: { sourceNoteId: null },
+  });
   await deleteNote(id);
   return NextResponse.json({ success: true });
 }

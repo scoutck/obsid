@@ -13,7 +13,6 @@ export interface Note {
   tags: string[];
   type: string;
   links: string[];
-  unresolvedPeople: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,6 +22,8 @@ export interface PersonMeta {
   noteId: string;
   aliases: string[];
   role: string;
+  summary: string;
+  userContext: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +31,7 @@ export interface PersonMeta {
 export interface NotePerson {
   noteId: string;
   personNoteId: string;
+  highlight: string;
 }
 
 export interface Collection {
@@ -46,6 +48,32 @@ export interface CollectionFilter {
   query?: string;
 }
 
+export interface Conversation {
+  id: string;
+  title: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  role: "user" | "assistant";
+  content: string;
+  toolCalls: Array<{ name: string; input: Record<string, unknown> }>;
+  createdAt: Date;
+}
+
+export interface PendingPerson {
+  id: string;
+  name: string;
+  sourceNoteId: string | null;
+  sourceConversationId: string | null;
+  context: string;
+  status: "pending" | "confirmed" | "dismissed";
+  createdAt: Date;
+}
+
 export function parseNote(raw: {
   id: string;
   title: string;
@@ -53,15 +81,19 @@ export function parseNote(raw: {
   tags: string;
   type: string;
   links: string;
-  unresolvedPeople: string;
+  unresolvedPeople?: string;
   createdAt: Date;
   updatedAt: Date;
 }): Note {
   return {
-    ...raw,
+    id: raw.id,
+    title: raw.title,
+    content: raw.content,
     tags: JSON.parse(raw.tags),
+    type: raw.type,
     links: JSON.parse(raw.links),
-    unresolvedPeople: JSON.parse(raw.unresolvedPeople),
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
   };
 }
 
@@ -70,6 +102,8 @@ export function parsePersonMeta(raw: {
   noteId: string;
   aliases: string;
   role: string;
+  summary: string;
+  userContext: string;
   createdAt: Date;
   updatedAt: Date;
 }): PersonMeta {
@@ -88,5 +122,20 @@ export function parseCollection(raw: {
   return {
     ...raw,
     filter: JSON.parse(raw.filter),
+  };
+}
+
+export function parseChatMessage(raw: {
+  id: string;
+  conversationId: string;
+  role: string;
+  content: string;
+  toolCalls: string;
+  createdAt: Date;
+}): ChatMessage {
+  return {
+    ...raw,
+    role: raw.role as "user" | "assistant",
+    toolCalls: JSON.parse(raw.toolCalls),
   };
 }

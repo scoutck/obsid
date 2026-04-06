@@ -22,9 +22,9 @@ npx tsx prisma/migrate-commands.ts    # Migrate /claude commands from note conte
 
 **Obsid** is an AI-powered markdown knowledge base — a single Next.js 16 app with a CodeMirror 6 editor, SQLite storage via Prisma, and Claude AI integration.
 
-### The UI is one element: the editor
+### Two modes: notes and chat
 
-`src/app/page.tsx` is the entire app. It manages note state, auto-save, and all command handlers. The `Editor` component (`src/components/Editor.tsx`) wraps CodeMirror 6 and owns the slash menu. There is no sidebar, toolbar, or navigation — everything goes through the `/` slash command menu or keyboard.
+`src/app/page.tsx` is the entire app. It manages mode state (`"notes" | "chat"`), note state, auto-save, and all command handlers. In notes mode, the `Editor` component (`src/components/Editor.tsx`) wraps CodeMirror 6 and owns the slash menu. In chat mode, `ChatView` (`src/components/ChatView.tsx`) renders a persistent conversation with Claude. Switch via `/chatmode` and `/notemode` slash commands. There is no sidebar, toolbar, or navigation — everything goes through the `/` slash command menu or keyboard. Slash commands are mode-aware (`slash-commands.ts` has a `mode` field).
 
 ### Prisma v7 + libsql adapter
 
@@ -52,23 +52,37 @@ The Editor also owns a `TagMenu` autocomplete dropdown (triggered by `#`) alongs
 
 The Editor detects `/` via an `updateListener`, positions the `SlashMenu` component at cursor coordinates, and on selection removes the slash text then calls the page's `onSlashCommand` handler via `requestAnimationFrame` to ensure view state is settled.
 
+### Semantic search via embeddings
+
+Every note is embedded on save via Voyage AI (`voyage-3`, 1024 dims). `src/lib/embeddings.ts` has `embedNote()` (fire-and-forget on save), `semanticSearch()` (brute-force cosine over all embeddings), and pure `cosineSimilarity()`/`rankBySimilarity()` functions. Vectors stored as binary blobs in the `Embedding` table. `VOYAGE_API_KEY` env var required. Falls back to FTS5 if embeddings unavailable.
+
 ### AI integration
 
-`src/lib/ai-tools.ts` defines five vault tools (`search_notes`, `read_note`, `create_note`, `update_note`, `list_people`) and an `executeTool` dispatcher. `src/app/api/ai/route.ts` implements the Anthropic tool-use loop: send message → if `stop_reason === "tool_use"`, execute tools and send results back → repeat until final text response.
+`src/lib/ai-tools.ts` defines seven vault tools (`semantic_search`, `read_note`, `create_note`, `update_note`, `list_people`, `update_person`, `create_pending_person`) and an `executeTool` dispatcher with optional `meta` param for source tracking. `src/app/api/ai/route.ts` implements the Anthropic tool-use loop: send message → if `stop_reason === "tool_use"`, execute tools and send results back → repeat until final text response.
+
+### Chat system
+
+`src/app/api/ai/chat/route.ts` — persistent chat with Claude. Saves user + assistant messages to `Conversation`/`Message` tables. Tool-use loop with vault tools + semantic search. Auto-titles conversation from first message. `src/lib/conversations.ts` has CRUD for conversations and messages.
 
 ### AI organize system
 
-`src/app/api/ai/organize/route.ts` — single Sonnet prompt with vault context (top tags, 100 recent note titles, recent siblings, people list). Called on note close (2s debounced, fire-and-forget) and via `/organize` slash command. Fetches note server-side, snapshots `updatedAt`, uses atomic conditional update to discard results if note changed during AI processing. Appends `#tags` and `[[links]]` to note content, creates/links people.
+`src/app/api/ai/organize/route.ts` — single Sonnet prompt with vault context (100 recent note titles, recent siblings, people list). Called on note close (2s debounced, fire-and-forget) and via `/organize` slash command. Fetches note server-side, snapshots `updatedAt`, uses atomic conditional update to discard results if note changed during AI processing. Appends `[[links]]` to note content, links known people. Tags are user-owned — organize does NOT modify tags. Unrecognized names create `PendingPerson` entries instead of auto-creating person notes.
 
 `src/app/api/ai/command/route.ts` — `/claude` inline commands. Tool-use loop like Ask Claude. Stores command + confirmation in the `Command` table (not in note content). `GET /api/notes/[id]/commands` fetches commands for a note.
 
 ### Person system
 
-Person = Note with `type: "person"` + `PersonMeta` (aliases, role). `NotePerson` join table tracks mentions. `src/lib/people.ts` handles CRUD with case-insensitive alias resolution (returns null for ambiguous matches). `unresolvedPeople` JSON field on Note stores names the AI couldn't match.
+Person = Note with `type: "person"` + `PersonMeta` (aliases, role, summary, userContext). `NotePerson` join table tracks mentions (with `highlight` field). `src/lib/people.ts` handles CRUD with case-insensitive alias resolution (returns null for ambiguous matches).
+
+`PendingPerson` table stores AI-detected names awaiting user confirmation. `/pendingpeople` command opens review modal (confirm → `/newperson` flow, merge with existing, or dismiss). `src/lib/pending-people.ts` has CRUD with deduplication.
+
+`/newperson` command: stepped inline flow (name → role → context). Creates person note + PersonMeta + auto-generates aliases.
+
+`/api/ai/person-summary` — regenerates AI-maintained relationship summary for a person. Fire-and-forget on new person-note links.
 
 ### Tag system
 
-Tags are inline `#tag` text in note content — content is the source of truth. `src/lib/extract-tags.ts` has the pure `extractInlineTags()` function (client-safe). `src/lib/tags.ts` re-exports it and adds `getTagVocabulary()` (server-only, uses Prisma). The `tags` DB field is a search cache populated on auto-save.
+Tags are inline `#tag` text in note content — content is the source of truth. Tags are user-owned; the AI does not add or modify tags. `src/lib/extract-tags.ts` has the pure `extractInlineTags()` function (client-safe). `src/lib/tags.ts` re-exports it and adds `getTagVocabulary()` (server-only, uses Prisma). The `tags` DB field is a search cache populated on auto-save.
 
 ### Testing
 
@@ -88,3 +102,6 @@ Vitest with `fileParallelism: false` (SQLite concurrency). `tests/setup.ts` crea
 - **Client/server import boundary for pure functions.** `extractInlineTags` lives in `src/lib/extract-tags.ts` (no Prisma import) so `page.tsx` can use it. `src/lib/tags.ts` re-exports it for server use. Don't import `src/lib/tags.ts` from client components — it pulls in Prisma.
 - **`/claude` Enter key removes the line from content.** The custom Enter keymap detects `/claude <instruction>`, deletes the line, stores a Command in the DB, and adds a widget decoration via `addCommandEffect`. The command text never persists in note content.
 - **Use ISO strings for raw SQL timestamps, not `CURRENT_TIMESTAMP`.** Prisma writes `@updatedAt` as ISO strings (`2026-04-05T22:00:00.123Z`). SQLite's `CURRENT_TIMESTAMP` produces `2026-04-05 22:00:00` (no millis, space separator). Mixing formats breaks conditional updates. Use `new Date().toISOString()` in parameterized queries.
+- **`VOYAGE_API_KEY` must be set for semantic search.** Without it, embeddings fail silently and search falls back to FTS5. Add to `.env.local`.
+- **Chat messages are not notes.** Chat is stored in `Conversation`/`Message` tables, not in Note content. Don't confuse the two.
+- **Person summaries regenerate on link.** Fire-and-forget POST to `/api/ai/person-summary`. Receives current summary as input to preserve user edits.

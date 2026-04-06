@@ -9,13 +9,17 @@ import PeopleModal from "@/components/PeopleModal";
 import AiPrompt from "@/components/AiPrompt";
 import AiResponseBlock from "@/components/AiResponseBlock";
 import Toast from "@/components/Toast";
+import ChatView from "@/components/ChatView";
+import PersonPage from "@/components/PersonPage";
+import NewPersonFlow from "@/components/NewPersonFlow";
+import PendingPeopleModal from "@/components/PendingPeopleModal";
 import { executeFormatting } from "@/editor/formatting";
 import { extractWikiLinks } from "@/editor/wiki-links";
 import { extractInlineTags } from "@/lib/extract-tags";
 import { updateCommandEffect } from "@/editor/command-widgets";
 import type { SlashCommand } from "@/editor/slash-commands";
 import type { EditorView } from "@codemirror/view";
-import type { Note, CommandData } from "@/types";
+import type { Note, CommandData, Conversation } from "@/types";
 
 export default function Home() {
   const [noteId, setNoteId] = useState<string | null>(null);
@@ -30,6 +34,12 @@ export default function Home() {
   const [showPeopleModal, setShowPeopleModal] = useState(false);
   const [showAiPrompt, setShowAiPrompt] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [mode, setMode] = useState<"notes" | "chat">("notes");
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [showNewPerson, setShowNewPerson] = useState(false);
+  const [newPersonPrefill, setNewPersonPrefill] = useState<string | undefined>();
+  const [showPendingPeople, setShowPendingPeople] = useState(false);
+  const [personPageId, setPersonPageId] = useState<string | null>(null);
   const [aiResponse, setAiResponse] = useState<{
     prompt: string;
     response: string;
@@ -262,9 +272,9 @@ export default function Home() {
           }
           loadNote(noteId);
           const parts: string[] = [];
-          if (result.tagsAdded?.length) parts.push(`${result.tagsAdded.length} tags`);
           if (result.linksAdded?.length) parts.push(`${result.linksAdded.length} links`);
           if (result.peopleResolved?.length) parts.push(`${result.peopleResolved.length} people`);
+          if (result.pendingPeople?.length) parts.push(`${result.pendingPeople.length} pending`);
           setToast(parts.length > 0 ? `Added ${parts.join(", ")}` : "Already organized");
         });
         return;
@@ -277,6 +287,50 @@ export default function Home() {
 
       if (command.action === "ai:ask") {
         setShowAiPrompt(true);
+        return;
+      }
+
+      if (command.action === "mode:chat") {
+        fetch("/api/conversations")
+          .then((res) => res.json())
+          .then(async (conv) => {
+            if (!conv) {
+              const createRes = await fetch("/api/conversations", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}),
+              });
+              conv = await createRes.json();
+            }
+            setConversation(conv);
+            setMode("chat");
+          });
+        return;
+      }
+
+      if (command.action === "mode:notes") {
+        setMode("notes");
+        return;
+      }
+
+      if (command.action === "mode:new-chat") {
+        fetch("/api/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        })
+          .then((res) => res.json())
+          .then((conv) => setConversation(conv));
+        return;
+      }
+
+      if (command.action === "org:new-person") {
+        setShowNewPerson(true);
+        return;
+      }
+
+      if (command.action === "org:pending-people") {
+        setShowPendingPeople(true);
         return;
       }
 
@@ -410,7 +464,73 @@ export default function Home() {
     requestAnimationFrame(() => editorViewRef.current?.focus());
   }, []);
 
-  if (!noteId) {
+  const handleNewPersonComplete = useCallback(
+    async (data: { name: string; role: string; userContext: string }) => {
+      setShowNewPerson(false);
+      setNewPersonPrefill(undefined);
+
+      const res = await fetch("/api/people/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: data.name,
+          role: data.role,
+          userContext: data.userContext,
+        }),
+      });
+      const person = await res.json();
+
+      if (data.userContext) {
+        fetch("/api/ai/person-summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ personNoteId: person.note.id }),
+        }).catch(() => {});
+      }
+
+      setToast(`Added ${data.name}`);
+    },
+    []
+  );
+
+  const handleChatSlashCommand = useCallback(
+    (action: string) => {
+      if (action === "notemode" || action === "mode:notes") {
+        setMode("notes");
+      } else if (action === "newchat" || action === "mode:new-chat") {
+        fetch("/api/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        })
+          .then((res) => res.json())
+          .then((conv) => setConversation(conv));
+      } else if (action === "people" || action === "org:people") {
+        setShowPeopleModal(true);
+      } else if (action === "newperson" || action === "org:new-person") {
+        setShowNewPerson(true);
+      } else if (action === "pendingpeople" || action === "org:pending-people") {
+        setShowPendingPeople(true);
+      } else if (action === "newnote" || action === "note:new") {
+        fetch("/api/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        })
+          .then((res) => res.json())
+          .then((note) => {
+            setNoteId(note.id);
+            setContent("");
+            setMode("notes");
+          });
+      } else if (action === "opennote" || action === "note:open") {
+        setShowNoteSearch(true);
+      }
+    },
+    []
+  );
+
+  if (!noteId && mode === "notes") {
     return (
       <div className="flex items-center justify-center h-screen">
         <p className="text-zinc-500">Loading...</p>
@@ -420,17 +540,41 @@ export default function Home() {
 
   return (
     <main className="h-screen w-screen flex flex-col">
+      {/* Mode indicator */}
+      {mode === "chat" && (
+        <div className="flex items-center justify-center py-1">
+          <span className="text-xs text-zinc-300">chat</span>
+        </div>
+      )}
+
       <div className="flex-1 overflow-hidden">
-        <Editor
-          key={noteId}
-          initialContent={content}
-          initialCommands={noteCommands}
-          onChange={handleChange}
-          onSlashCommand={handleSlashCommand}
-          onWikiLinkClick={handleWikiLinkClick}
-          onClaudeCommand={handleClaudeCommand}
-          editorViewRef={editorViewRef}
-        />
+        {personPageId ? (
+          <PersonPage
+            personNoteId={personPageId}
+            onSelectNote={(id) => {
+              setPersonPageId(null);
+              loadNote(id);
+            }}
+            onBack={() => setPersonPageId(null)}
+          />
+        ) : mode === "chat" && conversation ? (
+          <ChatView
+            conversation={conversation}
+            onSlashCommand={handleChatSlashCommand}
+          />
+        ) : (
+          <Editor
+            key={noteId ?? "empty"}
+            initialContent={content}
+            initialCommands={noteCommands}
+            mode={mode}
+            onChange={handleChange}
+            onSlashCommand={handleSlashCommand}
+            onWikiLinkClick={handleWikiLinkClick}
+            onClaudeCommand={handleClaudeCommand}
+            editorViewRef={editorViewRef}
+          />
+        )}
       </div>
 
       <div className="max-w-[720px] mx-auto w-full px-4">
@@ -467,9 +611,9 @@ export default function Home() {
       )}
       {showPeopleModal && (
         <PeopleModal
-          onSelectNote={(note) => {
+          onViewPerson={(personNoteId) => {
             setShowPeopleModal(false);
-            loadNote(note.id);
+            setPersonPageId(personNoteId);
           }}
           onClose={() => setShowPeopleModal(false)}
         />
@@ -486,6 +630,28 @@ export default function Home() {
       )}
       {toast && (
         <Toast message={toast} onDismiss={() => setToast(null)} />
+      )}
+
+      {showNewPerson && (
+        <NewPersonFlow
+          prefillName={newPersonPrefill}
+          onComplete={handleNewPersonComplete}
+          onCancel={() => {
+            setShowNewPerson(false);
+            setNewPersonPrefill(undefined);
+          }}
+        />
+      )}
+
+      {showPendingPeople && (
+        <PendingPeopleModal
+          onConfirm={(name) => {
+            setShowPendingPeople(false);
+            setNewPersonPrefill(name);
+            setShowNewPerson(true);
+          }}
+          onClose={() => setShowPendingPeople(false)}
+        />
       )}
     </main>
   );

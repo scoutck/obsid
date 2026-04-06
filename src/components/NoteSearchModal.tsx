@@ -20,15 +20,39 @@ export default function NoteSearchModal({ onSelect, onClose }: NoteSearchModalPr
 
   useEffect(() => {
     async function search() {
-      const url = query
-        ? `/api/notes?q=${encodeURIComponent(query)}`
-        : "/api/notes";
-      const res = await fetch(url);
-      const notes = await res.json();
-      setResults(notes);
+      if (!query) {
+        // No query — list recent notes
+        const res = await fetch("/api/notes");
+        setResults(await res.json());
+        setSelectedIndex(0);
+        return;
+      }
+
+      // Try semantic search first
+      try {
+        const res = await fetch("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, limit: 20 }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setResults(data);
+          setSelectedIndex(0);
+          return;
+        }
+      } catch {
+        // Fall through to keyword search
+      }
+
+      // Fall back to keyword search
+      const res = await fetch(`/api/notes?q=${encodeURIComponent(query)}`);
+      setResults(await res.json());
       setSelectedIndex(0);
     }
-    search();
+
+    const timer = setTimeout(search, 200);  // Debounce for embedding API
+    return () => clearTimeout(timer);
   }, [query]);
 
   function handleKeyDown(e: React.KeyboardEvent) {

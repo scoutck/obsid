@@ -26,17 +26,20 @@ model Collection {
 }
 
 model PersonMeta {
-  id        String   @id @default(uuid())
-  noteId    String   @unique
-  aliases   String   @default("[]")
-  role      String   @default("")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid())
+  noteId      String   @unique
+  aliases     String   @default("[]")
+  role        String   @default("")
+  summary     String   @default("")
+  userContext String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model NotePerson {
   noteId       String
   personNoteId String
+  highlight    String @default("")
 
   @@id([noteId, personNoteId])
 }
@@ -51,4 +54,40 @@ model Command {
   createdAt    DateTime @default(now())
 
   @@index([noteId])
+}
+
+model Embedding {
+  id        String   @id @default(uuid())
+  noteId    String   @unique
+  vector    Bytes
+  model     String
+  updatedAt DateTime @updatedAt
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  title     String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  role           String
+  content        String   @default("")
+  toolCalls      String   @default("[]")
+  createdAt      DateTime @default(now())
+
+  @@index([conversationId])
+}
+
+model PendingPerson {
+  id                   String   @id @default(uuid())
+  name                 String
+  sourceNoteId         String?
+  sourceConversationId String?
+  context              String   @default("")
+  status               String   @default("pending")
+  createdAt            DateTime @default(now())
 }
