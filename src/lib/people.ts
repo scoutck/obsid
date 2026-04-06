@@ -192,3 +192,13 @@ export async function getNotesMentioning(
 
   return notes;
 }
+
+export async function updatePersonSummary(
+  noteId: string,
+  summary: string
+): Promise<void> {
+  await prisma.personMeta.update({
+    where: { noteId },
+    data: { summary },
+  });
+}
