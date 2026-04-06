@@ -66,6 +66,16 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
+  // In dev mode, skip remote DB routing — use local dev.db instead
+  if (process.env.NODE_ENV !== "production") {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-user-id", payload.sub);
+    requestHeaders.set("x-username", payload.username);
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+  }
+
   // Look up user's DB credentials (cached)
   const user = await getUserCredentials(payload.sub);
   if (!user) {
