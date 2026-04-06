@@ -34,6 +34,7 @@ export default function PersonPage({ personNoteId, onSelectNote, onBack }: Perso
     setLoading(false);
   }, [personNoteId]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const saveSummary = async () => {

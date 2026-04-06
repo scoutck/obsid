@@ -29,6 +29,7 @@ export default function PendingPeopleModal({ onConfirm, onClose }: PendingPeople
     setLoading(false);
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleDismiss = async (id: string) => {
