@@ -98,9 +98,10 @@ interface EditorProps {
   onWikiLinkClick?: (title: string) => void;
   onClaudeCommand?: (instruction: string, commandId: string, line: number) => void;
   editorViewRef?: React.MutableRefObject<EditorView | null>;
+  mode?: "notes" | "chat";
 }
 
-export default function Editor({ initialContent = "", initialCommands, onChange, onSlashCommand, onWikiLinkClick, onClaudeCommand, editorViewRef }: EditorProps) {
+export default function Editor({ initialContent = "", initialCommands, onChange, onSlashCommand, onWikiLinkClick, onClaudeCommand, editorViewRef, mode }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const initialContentRef = useRef(initialContent);
@@ -366,6 +367,7 @@ export default function Editor({ initialContent = "", initialCommands, onChange,
         <SlashMenu
           query={slashMenu.query}
           position={slashMenu.position}
+          mode={mode}
           onSelect={handleSlashSelect}
           onClose={closeSlashMenu}
         />

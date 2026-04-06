@@ -6,6 +6,7 @@ import { filterCommands, type SlashCommand } from "@/editor/slash-commands";
 interface SlashMenuProps {
   query: string;
   position: { top: number; left: number };
+  mode?: "notes" | "chat";
   onSelect: (command: SlashCommand) => void;
   onClose: () => void;
 }
@@ -13,12 +14,13 @@ interface SlashMenuProps {
 export default function SlashMenu({
   query,
   position,
+  mode,
   onSelect,
   onClose,
 }: SlashMenuProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
-  const filtered = filterCommands(query);
+  const filtered = filterCommands(query, mode);
 
   useEffect(() => {
     setSelectedIndex(0);
