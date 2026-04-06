@@ -14,6 +14,7 @@ const anthropic = new Anthropic();
 
 export async function POST(request: NextRequest) {
   const db = getDb(request);
+  const cookie = request.headers.get("cookie") ?? "";
   const { conversationId, content } = await request.json();
 
   const conversation = await getConversation(conversationId, db);
@@ -93,7 +94,7 @@ Be concise and helpful. When you use tools, briefly confirm what you did.`;
         const result = await executeTool(
           block.name,
           block.input as Record<string, unknown>,
-          { sourceConversationId: conversationId },
+          { sourceConversationId: conversationId, cookie },
           db
         );
         toolResults.push({

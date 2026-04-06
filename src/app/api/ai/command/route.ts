@@ -8,6 +8,7 @@ const anthropic = new Anthropic();
 
 export async function POST(request: NextRequest) {
   const db = getDb(request);
+  const cookie = request.headers.get("cookie") ?? "";
   const { instruction, noteId, noteContent, noteTitle, cursorPosition, line } =
     await request.json();
 
@@ -68,7 +69,7 @@ You have tools to search, read, create, and update notes. Execute the user's ins
           const result = await executeTool(
             block.name,
             block.input as Record<string, unknown>,
-            { sourceNoteId: noteId },
+            { sourceNoteId: noteId, cookie },
             db
           );
           toolResults.push({

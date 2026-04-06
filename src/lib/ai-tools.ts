@@ -98,7 +98,7 @@ export const vaultTools: Anthropic.Tool[] = [
 export async function executeTool(
   name: string,
   input: Record<string, unknown>,
-  meta?: { sourceNoteId?: string; sourceConversationId?: string },
+  meta?: { sourceNoteId?: string; sourceConversationId?: string; cookie?: string },
   db: PrismaClient = defaultPrisma
 ): Promise<string> {
   switch (name) {
@@ -178,7 +178,10 @@ export async function executeTool(
       // Fire-and-forget person summary regeneration
       fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/ai/person-summary`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(meta?.cookie ? { Cookie: meta.cookie } : {}),
+        },
         body: JSON.stringify({ personNoteId: person.note.id }),
       }).catch(() => {});
       return `Added observation to ${person.note.title}'s note`;

@@ -22,6 +22,7 @@ interface OrganizeResult {
 
 export async function POST(request: NextRequest) {
   const db = getDb(request);
+  const cookieHeader = request.headers.get("cookie") ?? "";
   const { noteId, recentSiblingIds } = await request.json();
 
   // Fetch note and snapshot updatedAt for staleness detection
@@ -179,7 +180,10 @@ Return JSON in this exact format:
     if (linked) {
       fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/ai/person-summary`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+        },
         body: JSON.stringify({ personNoteId: linked.note.id }),
       }).catch(() => {});
     }

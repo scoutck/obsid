@@ -7,6 +7,7 @@ const anthropic = new Anthropic();
 
 export async function POST(request: NextRequest) {
   const db = getDb(request);
+  const cookie = request.headers.get("cookie") ?? "";
   const { prompt, currentNoteContent } = await request.json();
 
   const systemPrompt = `You are an AI assistant embedded in a markdown knowledge base called Obsid. You help the user with their notes — searching, summarizing, creating, and updating them.
@@ -51,7 +52,7 @@ Respond concisely. Use markdown formatting.`;
         const result = await executeTool(
           block.name,
           block.input as Record<string, unknown>,
-          undefined,
+          { cookie },
           db
         );
         toolResults.push({
