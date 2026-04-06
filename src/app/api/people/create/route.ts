@@ -4,13 +4,14 @@ import { createPerson } from "@/lib/people";
 export async function POST(request: NextRequest) {
   const { name, role, userContext } = await request.json();
 
-  const aliases = [name];
+  // createPerson auto-prepends input.name to aliases
+  const extraAliases: string[] = [];
   const firstName = name.split(" ")[0];
-  if (firstName !== name) aliases.push(firstName);
+  if (firstName !== name) extraAliases.push(firstName);
 
   const person = await createPerson({
     name,
-    aliases,
+    aliases: extraAliases,
     role: role ?? "",
     userContext: userContext ?? "",
     content: `# ${name}\n\n${role ? `**Role:** ${role}\n\n` : ""}${userContext ? userContext + "\n" : ""}`,

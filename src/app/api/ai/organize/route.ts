@@ -170,6 +170,18 @@ Return JSON in this exact format:
     console.error("[organize] embedNote failed:", err)
   );
 
+  // Fire-and-forget person summary regeneration for newly linked people
+  for (const person of result.people) {
+    const linked = await getPersonByAlias(person.name);
+    if (linked) {
+      fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/ai/person-summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personNoteId: linked.note.id }),
+      }).catch(() => {});
+    }
+  }
+
   return Response.json({
     linksAdded: result.links.filter((l) => !existingLinks.includes(l)),
     peopleResolved: resolvedPeople,

@@ -80,6 +80,7 @@ Be concise and helpful. When you use tools, briefly confirm what you did.`;
 
   // Tool-use loop
   const fullMessages = [...messages];
+  const allToolCalls: Array<{ name: string; input: Record<string, unknown> }> = [];
   while (response.stop_reason === "tool_use") {
     const assistantContent = response.content;
     fullMessages.push({ role: "assistant", content: assistantContent });
@@ -96,6 +97,10 @@ Be concise and helpful. When you use tools, briefly confirm what you did.`;
           type: "tool_result",
           tool_use_id: block.id,
           content: result,
+        });
+        allToolCalls.push({
+          name: block.name,
+          input: block.input as Record<string, unknown>,
         });
       }
     }
@@ -117,8 +122,8 @@ Be concise and helpful. When you use tools, briefly confirm what you did.`;
     if (block.type === "text") finalText += block.text;
   }
 
-  // Save assistant response
-  await addMessage(conversationId, "assistant", finalText);
+  // Save assistant response with tool calls for transparency
+  await addMessage(conversationId, "assistant", finalText, allToolCalls);
 
   return Response.json({ content: finalText });
 }

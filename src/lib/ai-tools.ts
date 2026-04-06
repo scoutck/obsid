@@ -172,6 +172,12 @@ export async function executeTool(
       if (meta?.sourceNoteId) {
         await addNotePerson(meta.sourceNoteId, person.note.id);
       }
+      // Fire-and-forget person summary regeneration
+      fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/ai/person-summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personNoteId: person.note.id }),
+      }).catch(() => {});
       return `Added observation to ${person.note.title}'s note`;
     }
 
