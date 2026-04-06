@@ -16,7 +16,7 @@ interface OrganizeResult {
   tags: string[];
   links: string[];
   people: Array<{ name: string; role?: string }>;
-  unresolvedPeople: string[];
+  unresolvedPeople?: string[];
   tagCorrections?: Array<{ from: string; to: string }>;
 }
 
@@ -203,7 +203,6 @@ Return JSON in this exact format:
     {
       content: updatedContent,
       tags: finalTags,
-      unresolvedPeople: result.unresolvedPeople,
     }
   );
 
@@ -215,7 +214,6 @@ Return JSON in this exact format:
     tagsAdded: result.tags.filter((t) => !existingTags.includes(t)),
     linksAdded: result.links.filter((l) => !existingLinks.includes(l)),
     peopleResolved: resolvedPeople,
-    unresolvedPeople: result.unresolvedPeople,
     tagCorrections: result.tagCorrections ?? [],
   });
 }

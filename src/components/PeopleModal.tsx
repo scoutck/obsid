@@ -33,17 +33,9 @@ export default function PeopleModal({ onSelectNote, onClose }: PeopleModalProps)
     const peopleData: PersonEntry[] = await peopleRes.json();
     const notes: Note[] = await notesRes.json();
 
-    // Aggregate unresolved people across all notes
+    // Unresolved people tracking moved to PendingPerson system in v1.2
     const unresolvedMap = new Map<string, string[]>();
-    for (const note of notes) {
-      const unresolvedPeople: string[] = note.unresolvedPeople ?? [];
-      for (const name of unresolvedPeople) {
-        const lower = name.toLowerCase();
-        const existing = unresolvedMap.get(lower) ?? [];
-        existing.push(note.id);
-        unresolvedMap.set(lower, existing);
-      }
-    }
+    void notes; // notes fetched but unresolved aggregation now handled by PendingPerson
 
     setPeople(peopleData);
     setUnresolved(
@@ -58,20 +50,7 @@ export default function PeopleModal({ onSelectNote, onClose }: PeopleModalProps)
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleResolve = async (name: string, personNoteId: string, noteIds: string[]) => {
-    for (const noteId of noteIds) {
-      const note = await fetch(`/api/notes/${noteId}`).then((r) => r.json());
-      const currentUnresolved: string[] = note.unresolvedPeople ?? [];
-      const updated = currentUnresolved.filter(
-        (n: string) => n.toLowerCase() !== name.toLowerCase()
-      );
-      await fetch(`/api/notes/${noteId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ unresolvedPeople: updated }),
-      });
-    }
-
+  const handleResolve = async (name: string, personNoteId: string, _noteIds: string[]) => {
     const person = people.find((p) => p.note.id === personNoteId);
     if (person) {
       const newAliases = [...new Set([...person.meta.aliases, name])];
