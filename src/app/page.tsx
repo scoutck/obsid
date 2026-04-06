@@ -262,9 +262,9 @@ export default function Home() {
           }
           loadNote(noteId);
           const parts: string[] = [];
-          if (result.tagsAdded?.length) parts.push(`${result.tagsAdded.length} tags`);
           if (result.linksAdded?.length) parts.push(`${result.linksAdded.length} links`);
           if (result.peopleResolved?.length) parts.push(`${result.peopleResolved.length} people`);
+          if (result.pendingPeople?.length) parts.push(`${result.pendingPeople.length} pending`);
           setToast(parts.length > 0 ? `Added ${parts.join(", ")}` : "Already organized");
         });
         return;
