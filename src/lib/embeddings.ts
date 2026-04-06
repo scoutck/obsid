@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/db";
+import { prisma as defaultPrisma } from "@/lib/db";
+import type { PrismaClient } from "@prisma/client";
 
 const VOYAGE_API_URL = "https://api.voyageai.com/v1/embeddings";
 const VOYAGE_MODEL = "voyage-3";
@@ -55,7 +56,7 @@ export async function embedText(text: string): Promise<Float32Array> {
   return new Float32Array(data.data[0].embedding);
 }
 
-export async function embedNote(noteId: string, title: string, content: string): Promise<void> {
+export async function embedNote(noteId: string, title: string, content: string, db: PrismaClient = defaultPrisma): Promise<void> {
   const text = `${title}\n${content}`.trim();
   if (!text) return;
 
@@ -69,14 +70,14 @@ export async function embedNote(noteId: string, title: string, content: string):
 
   const buffer = Buffer.from(vector.buffer.slice(0) as ArrayBuffer);
 
-  const existing = await prisma.embedding.findUnique({ where: { noteId } });
+  const existing = await db.embedding.findUnique({ where: { noteId } });
   if (existing) {
-    await prisma.embedding.update({
+    await db.embedding.update({
       where: { noteId },
       data: { vector: buffer, model: VOYAGE_MODEL },
     });
   } else {
-    await prisma.embedding.create({
+    await db.embedding.create({
       data: { noteId, vector: buffer, model: VOYAGE_MODEL },
     });
   }
@@ -84,11 +85,12 @@ export async function embedNote(noteId: string, title: string, content: string):
 
 export async function semanticSearch(
   query: string,
-  limit: number = 10
+  limit: number = 10,
+  db: PrismaClient = defaultPrisma
 ): Promise<Array<{ noteId: string; score: number }>> {
   const queryVector = await embedText(query);
 
-  const embeddings = await prisma.embedding.findMany();
+  const embeddings = await db.embedding.findMany();
 
   const items = embeddings.map((e) => ({
     id: e.noteId,

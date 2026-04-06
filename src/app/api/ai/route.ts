@@ -1,10 +1,12 @@
 import { NextRequest } from "next/server";
+import { getDb } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { vaultTools, executeTool } from "@/lib/ai-tools";
 
 const anthropic = new Anthropic();
 
 export async function POST(request: NextRequest) {
+  const db = getDb(request);
   const { prompt, currentNoteContent } = await request.json();
 
   const systemPrompt = `You are an AI assistant embedded in a markdown knowledge base called Obsid. You help the user with their notes — searching, summarizing, creating, and updating them.
@@ -48,7 +50,9 @@ Respond concisely. Use markdown formatting.`;
       if (block.type === "tool_use") {
         const result = await executeTool(
           block.name,
-          block.input as Record<string, unknown>
+          block.input as Record<string, unknown>,
+          undefined,
+          db
         );
         toolResults.push({
           type: "tool_result",

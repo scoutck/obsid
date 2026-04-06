@@ -1,22 +1,23 @@
-import { prisma } from "@/lib/db";
+import { prisma as defaultPrisma } from "@/lib/db";
+import type { PrismaClient } from "@prisma/client";
 import type { Conversation, ChatMessage } from "@/types";
 import { parseChatMessage } from "@/types";
 
-export async function createConversation(title: string = ""): Promise<Conversation> {
-  const raw = await prisma.conversation.create({
+export async function createConversation(title: string = "", db: PrismaClient = defaultPrisma): Promise<Conversation> {
+  const raw = await db.conversation.create({
     data: { title },
   });
   return raw as Conversation;
 }
 
-export async function getConversation(id: string): Promise<Conversation | null> {
-  const raw = await prisma.conversation.findUnique({ where: { id } });
+export async function getConversation(id: string, db: PrismaClient = defaultPrisma): Promise<Conversation | null> {
+  const raw = await db.conversation.findUnique({ where: { id } });
   if (!raw) return null;
   return raw as Conversation;
 }
 
-export async function getMostRecentConversation(): Promise<Conversation | null> {
-  const rows = await prisma.$queryRawUnsafe<
+export async function getMostRecentConversation(db: PrismaClient = defaultPrisma): Promise<Conversation | null> {
+  const rows = await db.$queryRawUnsafe<
     Array<{ id: string; title: string; createdAt: string; updatedAt: string }>
   >(`SELECT * FROM "Conversation" ORDER BY updatedAt DESC, rowid DESC LIMIT 1`);
   if (rows.length === 0) return null;
@@ -29,8 +30,8 @@ export async function getMostRecentConversation(): Promise<Conversation | null> 
   };
 }
 
-export async function updateConversationTitle(id: string, title: string): Promise<void> {
-  await prisma.conversation.update({
+export async function updateConversationTitle(id: string, title: string, db: PrismaClient = defaultPrisma): Promise<void> {
+  await db.conversation.update({
     where: { id },
     data: { title },
   });
@@ -40,9 +41,10 @@ export async function addMessage(
   conversationId: string,
   role: string,
   content: string,
-  toolCalls: Array<{ name: string; input: Record<string, unknown> }> = []
+  toolCalls: Array<{ name: string; input: Record<string, unknown> }> = [],
+  db: PrismaClient = defaultPrisma
 ): Promise<ChatMessage> {
-  const raw = await prisma.message.create({
+  const raw = await db.message.create({
     data: {
       conversationId,
       role,
@@ -52,7 +54,7 @@ export async function addMessage(
   });
 
   // Touch conversation updatedAt
-  await prisma.conversation.update({
+  await db.conversation.update({
     where: { id: conversationId },
     data: {},
   });
@@ -62,10 +64,11 @@ export async function addMessage(
 
 export async function getMessages(
   conversationId: string,
-  limit: number = 20
+  limit: number = 20,
+  db: PrismaClient = defaultPrisma
 ): Promise<ChatMessage[]> {
   // Get the N most recent messages (by insertion order), then return in chronological order
-  const rows = await prisma.$queryRawUnsafe<
+  const rows = await db.$queryRawUnsafe<
     Array<{
       id: string;
       conversationId: string;

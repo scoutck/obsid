@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getDb } from "@/lib/db";
 import { getCollection, deleteCollection } from "@/lib/collections";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const db = getDb(request);
   const { id } = await params;
-  const collection = await getCollection(id);
+  const collection = await getCollection(id, db);
   if (!collection) {
     return NextResponse.json({ error: "Collection not found" }, { status: 404 });
   }
@@ -14,10 +16,11 @@ export async function GET(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const db = getDb(request);
   const { id } = await params;
-  await deleteCollection(id);
+  await deleteCollection(id, db);
   return NextResponse.json({ success: true });
 }

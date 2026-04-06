@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getDb } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { vaultTools, executeTool } from "@/lib/ai-tools";
 import { createCommand, updateCommand } from "@/lib/commands";
@@ -6,6 +7,7 @@ import { createCommand, updateCommand } from "@/lib/commands";
 const anthropic = new Anthropic();
 
 export async function POST(request: NextRequest) {
+  const db = getDb(request);
   const { instruction, noteId, noteContent, noteTitle, cursorPosition, line } =
     await request.json();
 
@@ -44,7 +46,7 @@ You have tools to search, read, create, and update notes. Execute the user's ins
     noteId,
     line: line ?? 0,
     instruction,
-  });
+  }, db);
 
   let response;
   try {
@@ -66,7 +68,8 @@ You have tools to search, read, create, and update notes. Execute the user's ins
           const result = await executeTool(
             block.name,
             block.input as Record<string, unknown>,
-            { sourceNoteId: noteId }
+            { sourceNoteId: noteId },
+            db
           );
           toolResults.push({
             type: "tool_result",
@@ -91,7 +94,7 @@ You have tools to search, read, create, and update notes. Execute the user's ins
     await updateCommand(command.id, {
       confirmation: "AI request failed",
       status: "error",
-    });
+    }, db);
     return Response.json({ error: "AI request failed" }, { status: 502 });
   }
 
@@ -104,7 +107,7 @@ You have tools to search, read, create, and update notes. Execute the user's ins
   const updated = await updateCommand(command.id, {
     confirmation,
     status: "done",
-  });
+  }, db);
 
   return Response.json(updated);
 }

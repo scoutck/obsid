@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/db";
+import { prisma as defaultPrisma } from "@/lib/db";
+import type { PrismaClient } from "@prisma/client";
 import type { PendingPerson } from "@/types";
 
 interface CreatePendingPersonInput {
@@ -9,10 +10,11 @@ interface CreatePendingPersonInput {
 }
 
 export async function createPendingPerson(
-  input: CreatePendingPersonInput
+  input: CreatePendingPersonInput,
+  db: PrismaClient = defaultPrisma
 ): Promise<PendingPerson> {
   // Deduplicate: skip if same name + same source already pending
-  const existing = await prisma.pendingPerson.findFirst({
+  const existing = await db.pendingPerson.findFirst({
     where: {
       name: input.name,
       status: "pending",
@@ -25,7 +27,7 @@ export async function createPendingPerson(
 
   if (existing) return existing as unknown as PendingPerson;
 
-  const raw = await prisma.pendingPerson.create({
+  const raw = await db.pendingPerson.create({
     data: {
       name: input.name,
       sourceNoteId: input.sourceNoteId ?? null,
@@ -37,8 +39,8 @@ export async function createPendingPerson(
   return raw as unknown as PendingPerson;
 }
 
-export async function listPendingPeople(): Promise<PendingPerson[]> {
-  const raw = await prisma.pendingPerson.findMany({
+export async function listPendingPeople(db: PrismaClient = defaultPrisma): Promise<PendingPerson[]> {
+  const raw = await db.pendingPerson.findMany({
     where: { status: "pending" },
     orderBy: { createdAt: "desc" },
   });
@@ -47,14 +49,15 @@ export async function listPendingPeople(): Promise<PendingPerson[]> {
 
 export async function updatePendingPersonStatus(
   id: string,
-  status: "confirmed" | "dismissed"
+  status: "confirmed" | "dismissed",
+  db: PrismaClient = defaultPrisma
 ): Promise<void> {
-  await prisma.pendingPerson.update({
+  await db.pendingPerson.update({
     where: { id },
     data: { status },
   });
 }
 
-export async function dismissPendingPerson(id: string): Promise<void> {
-  await updatePendingPersonStatus(id, "dismissed");
+export async function dismissPendingPerson(id: string, db: PrismaClient = defaultPrisma): Promise<void> {
+  await updatePendingPersonStatus(id, "dismissed", db);
 }

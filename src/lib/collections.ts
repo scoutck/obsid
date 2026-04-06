@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/db";
+import { prisma as defaultPrisma } from "@/lib/db";
+import type { PrismaClient } from "@prisma/client";
 import { parseCollection, type Collection, type CollectionFilter } from "@/types";
 
 interface CreateCollectionInput {
@@ -7,9 +8,10 @@ interface CreateCollectionInput {
 }
 
 export async function createCollection(
-  input: CreateCollectionInput
+  input: CreateCollectionInput,
+  db: PrismaClient = defaultPrisma
 ): Promise<Collection> {
-  const raw = await prisma.collection.create({
+  const raw = await db.collection.create({
     data: {
       name: input.name,
       filter: JSON.stringify(input.filter),
@@ -18,19 +20,19 @@ export async function createCollection(
   return parseCollection(raw);
 }
 
-export async function getCollection(id: string): Promise<Collection | null> {
-  const raw = await prisma.collection.findUnique({ where: { id } });
+export async function getCollection(id: string, db: PrismaClient = defaultPrisma): Promise<Collection | null> {
+  const raw = await db.collection.findUnique({ where: { id } });
   if (!raw) return null;
   return parseCollection(raw);
 }
 
-export async function listCollections(): Promise<Collection[]> {
-  const raw = await prisma.collection.findMany({
+export async function listCollections(db: PrismaClient = defaultPrisma): Promise<Collection[]> {
+  const raw = await db.collection.findMany({
     orderBy: { createdAt: "desc" },
   });
   return raw.map(parseCollection);
 }
 
-export async function deleteCollection(id: string): Promise<void> {
-  await prisma.collection.delete({ where: { id } });
+export async function deleteCollection(id: string, db: PrismaClient = defaultPrisma): Promise<void> {
+  await db.collection.delete({ where: { id } });
 }

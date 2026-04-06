@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getDb } from "@/lib/db";
 import { getNote, updateNote, deleteNote } from "@/lib/notes";
 import { deleteCommandsForNote } from "@/lib/commands";
 import { embedNote } from "@/lib/embeddings";
-import { prisma } from "@/lib/db";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const db = getDb(request);
   const { id } = await params;
-  const note = await getNote(id);
+  const note = await getNote(id, db);
   if (!note) {
     return NextResponse.json({ error: "Note not found" }, { status: 404 });
   }
@@ -20,12 +21,13 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const db = getDb(request);
   const { id } = await params;
   const body = await request.json();
-  const note = await updateNote(id, body);
+  const note = await updateNote(id, body, db);
 
   // Fire-and-forget embedding
-  embedNote(note.id, note.title, note.content).catch((err) =>
+  embedNote(note.id, note.title, note.content, db).catch((err) =>
     console.error("[embed] Background embed failed:", err)
   );
 
@@ -33,17 +35,18 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const db = getDb(request);
   const { id } = await params;
-  await deleteCommandsForNote(id);
-  await prisma.embedding.deleteMany({ where: { noteId: id } });
-  await prisma.notePerson.deleteMany({ where: { noteId: id } });
-  await prisma.pendingPerson.updateMany({
+  await deleteCommandsForNote(id, db);
+  await db.embedding.deleteMany({ where: { noteId: id } });
+  await db.notePerson.deleteMany({ where: { noteId: id } });
+  await db.pendingPerson.updateMany({
     where: { sourceNoteId: id },
     data: { sourceNoteId: null },
   });
-  await deleteNote(id);
+  await deleteNote(id, db);
   return NextResponse.json({ success: true });
 }

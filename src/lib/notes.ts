@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/db";
+import { prisma as defaultPrisma } from "@/lib/db";
+import type { PrismaClient } from "@prisma/client";
 import { parseNote, type Note } from "@/types";
 
 interface CreateNoteInput {
@@ -17,8 +18,8 @@ interface UpdateNoteInput {
   links?: string[];
 }
 
-export async function createNote(input: CreateNoteInput): Promise<Note> {
-  const raw = await prisma.note.create({
+export async function createNote(input: CreateNoteInput, db: PrismaClient = defaultPrisma): Promise<Note> {
+  const raw = await db.note.create({
     data: {
       title: input.title ?? "",
       content: input.content ?? "",
@@ -30,15 +31,16 @@ export async function createNote(input: CreateNoteInput): Promise<Note> {
   return parseNote(raw);
 }
 
-export async function getNote(id: string): Promise<Note | null> {
-  const raw = await prisma.note.findUnique({ where: { id } });
+export async function getNote(id: string, db: PrismaClient = defaultPrisma): Promise<Note | null> {
+  const raw = await db.note.findUnique({ where: { id } });
   if (!raw) return null;
   return parseNote(raw);
 }
 
 export async function updateNote(
   id: string,
-  input: UpdateNoteInput
+  input: UpdateNoteInput,
+  db: PrismaClient = defaultPrisma
 ): Promise<Note> {
   const data: Record<string, unknown> = {};
   if (input.title !== undefined) data.title = input.title;
@@ -47,7 +49,7 @@ export async function updateNote(
   if (input.type !== undefined) data.type = input.type;
   if (input.links !== undefined) data.links = JSON.stringify(input.links);
 
-  const raw = await prisma.note.update({ where: { id }, data });
+  const raw = await db.note.update({ where: { id }, data });
   return parseNote(raw);
 }
 
@@ -59,7 +61,8 @@ export async function updateNote(
 export async function conditionalUpdateNote(
   id: string,
   expectedUpdatedAt: Date,
-  input: UpdateNoteInput
+  input: UpdateNoteInput,
+  db: PrismaClient = defaultPrisma
 ): Promise<boolean> {
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -80,7 +83,7 @@ export async function conditionalUpdateNote(
   params.push(new Date().toISOString());
   params.push(id, expectedUpdatedAt.toISOString());
 
-  const result = await prisma.$executeRawUnsafe(
+  const result = await db.$executeRawUnsafe(
     `UPDATE "Note" SET ${sets.join(", ")} WHERE id = ? AND "updatedAt" = ?`,
     ...params
   );
@@ -88,12 +91,12 @@ export async function conditionalUpdateNote(
   return result > 0;
 }
 
-export async function deleteNote(id: string): Promise<void> {
-  await prisma.note.delete({ where: { id } });
+export async function deleteNote(id: string, db: PrismaClient = defaultPrisma): Promise<void> {
+  await db.note.delete({ where: { id } });
 }
 
-export async function listNotes(): Promise<Note[]> {
-  const raw = await prisma.$queryRawUnsafe<
+export async function listNotes(db: PrismaClient = defaultPrisma): Promise<Note[]> {
+  const raw = await db.$queryRawUnsafe<
     Array<{
       id: string;
       title: string;
@@ -122,11 +125,12 @@ export async function listNotes(): Promise<Note[]> {
 export async function listContextNotes(
   excludeNoteId: string,
   personNoteIds: string[],
-  limit: number = 100
+  limit: number = 100,
+  db: PrismaClient = defaultPrisma
 ): Promise<Note[]> {
   const excludeIds = [excludeNoteId, ...personNoteIds];
   const placeholders = excludeIds.map(() => "?").join(", ");
-  const raw = await prisma.$queryRawUnsafe<
+  const raw = await db.$queryRawUnsafe<
     Array<{
       id: string;
       title: string;
@@ -152,9 +156,9 @@ export async function listContextNotes(
   );
 }
 
-export async function searchNotes(query: string): Promise<Note[]> {
+export async function searchNotes(query: string, db: PrismaClient = defaultPrisma): Promise<Note[]> {
   try {
-    const results = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+    const results = await db.$queryRawUnsafe<Array<{ id: string }>>(
       `SELECT id FROM notes_fts WHERE notes_fts MATCH ? ORDER BY rank`,
       query + "*"
     );
@@ -162,14 +166,14 @@ export async function searchNotes(query: string): Promise<Note[]> {
     if (results.length === 0) return [];
 
     const ids = results.map((r) => r.id);
-    const raw = await prisma.note.findMany({
+    const raw = await db.note.findMany({
       where: { id: { in: ids } },
     });
     return raw.map(parseNote);
   } catch {
     // FTS table may not exist in test environment; fall back to LIKE search
     const term = `%${query}%`;
-    const raw = await prisma.$queryRawUnsafe<
+    const raw = await db.$queryRawUnsafe<
       Array<{
         id: string;
         title: string;
@@ -198,10 +202,11 @@ export async function searchNotes(query: string): Promise<Note[]> {
 }
 
 export async function getRecentNotes(
-  ids: string[]
+  ids: string[],
+  db: PrismaClient = defaultPrisma
 ): Promise<Note[]> {
   if (ids.length === 0) return [];
-  const raw = await prisma.note.findMany({
+  const raw = await db.note.findMany({
     where: { id: { in: ids } },
   });
   return raw.map(parseNote);

@@ -1,16 +1,18 @@
 import { NextRequest } from "next/server";
+import { getDb } from "@/lib/db";
 import { semanticSearch } from "@/lib/embeddings";
 import { searchNotes, getNote } from "@/lib/notes";
 
 export async function POST(request: NextRequest) {
+  const db = getDb(request);
   const { query, limit } = await request.json();
 
   try {
-    const results = await semanticSearch(query, limit ?? 20);
+    const results = await semanticSearch(query, limit ?? 20, db);
 
     const notes = await Promise.all(
       results.map(async (r) => {
-        const note = await getNote(r.noteId);
+        const note = await getNote(r.noteId, db);
         return note;
       })
     );
@@ -18,7 +20,7 @@ export async function POST(request: NextRequest) {
     return Response.json(notes.filter(Boolean));
   } catch {
     // Fall back to keyword search if embeddings unavailable
-    const notes = await searchNotes(query);
+    const notes = await searchNotes(query, db);
     return Response.json(notes.slice(0, limit ?? 20));
   }
 }

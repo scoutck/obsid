@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getDb } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { vaultTools, executeTool } from "@/lib/ai-tools";
 import {
@@ -12,27 +13,28 @@ import { listPeople } from "@/lib/people";
 const anthropic = new Anthropic();
 
 export async function POST(request: NextRequest) {
+  const db = getDb(request);
   const { conversationId, content } = await request.json();
 
-  const conversation = await getConversation(conversationId);
+  const conversation = await getConversation(conversationId, db);
   if (!conversation) {
     return Response.json({ error: "Conversation not found" }, { status: 404 });
   }
 
   // Save user message
-  await addMessage(conversationId, "user", content);
+  await addMessage(conversationId, "user", content, [], db);
 
   // Auto-title from first message
   if (!conversation.title && content) {
     const title = content.slice(0, 60) + (content.length > 60 ? "..." : "");
-    await updateConversationTitle(conversationId, title);
+    await updateConversationTitle(conversationId, title, db);
   }
 
   // Load conversation history
-  const history = await getMessages(conversationId, 20);
+  const history = await getMessages(conversationId, 20, db);
 
   // Build people context
-  const people = await listPeople();
+  const people = await listPeople(db);
   const peopleList = people
     .map(
       (p) =>
@@ -91,7 +93,8 @@ Be concise and helpful. When you use tools, briefly confirm what you did.`;
         const result = await executeTool(
           block.name,
           block.input as Record<string, unknown>,
-          { sourceConversationId: conversationId }
+          { sourceConversationId: conversationId },
+          db
         );
         toolResults.push({
           type: "tool_result",
@@ -123,7 +126,7 @@ Be concise and helpful. When you use tools, briefly confirm what you did.`;
   }
 
   // Save assistant response with tool calls for transparency
-  await addMessage(conversationId, "assistant", finalText, allToolCalls);
+  await addMessage(conversationId, "assistant", finalText, allToolCalls, db);
 
   return Response.json({ content: finalText });
 }
