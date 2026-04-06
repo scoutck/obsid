@@ -77,11 +77,12 @@ export async function POST(request: NextRequest) {
   // Issue JWT
   const token = await createToken({ sub: userId, username });
 
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
   const response = Response.json({ success: true, username });
   const headers = new Headers(response.headers);
   headers.append(
     "Set-Cookie",
-    `token=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${30 * 24 * 60 * 60}`
+    `token=${token}; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=${30 * 24 * 60 * 60}`
   );
 
   return new Response(response.body, {

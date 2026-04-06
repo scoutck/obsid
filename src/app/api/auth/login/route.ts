@@ -32,11 +32,12 @@ export async function POST(request: NextRequest) {
 
   const token = await createToken({ sub: user.id, username: user.username });
 
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
   const response = Response.json({ success: true, username: user.username });
   const headers = new Headers(response.headers);
   headers.append(
     "Set-Cookie",
-    `token=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${30 * 24 * 60 * 60}`
+    `token=${token}; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=${30 * 24 * 60 * 60}`
   );
 
   return new Response(response.body, {
