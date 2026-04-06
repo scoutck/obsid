@@ -2,17 +2,19 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Editor from "@/components/Editor";
-import NoteSearchModal from "@/components/NoteSearchModal";
-import TagInput from "@/components/TagInput";
-import CollectionModal from "@/components/CollectionModal";
-import PeopleModal from "@/components/PeopleModal";
-import AiPrompt from "@/components/AiPrompt";
-import AiResponseBlock from "@/components/AiResponseBlock";
 import Toast from "@/components/Toast";
-import ChatView from "@/components/ChatView";
-import PersonPage from "@/components/PersonPage";
-import NewPersonFlow from "@/components/NewPersonFlow";
-import PendingPeopleModal from "@/components/PendingPeopleModal";
+import dynamic from "next/dynamic";
+
+const NoteSearchModal = dynamic(() => import("@/components/NoteSearchModal"));
+const TagInput = dynamic(() => import("@/components/TagInput"));
+const CollectionModal = dynamic(() => import("@/components/CollectionModal"));
+const PeopleModal = dynamic(() => import("@/components/PeopleModal"));
+const AiPrompt = dynamic(() => import("@/components/AiPrompt"));
+const AiResponseBlock = dynamic(() => import("@/components/AiResponseBlock"));
+const ChatView = dynamic(() => import("@/components/ChatView"));
+const PersonPage = dynamic(() => import("@/components/PersonPage"));
+const NewPersonFlow = dynamic(() => import("@/components/NewPersonFlow"));
+const PendingPeopleModal = dynamic(() => import("@/components/PendingPeopleModal"));
 import { executeFormatting } from "@/editor/formatting";
 import { extractWikiLinks } from "@/editor/wiki-links";
 import { extractInlineTags } from "@/lib/extract-tags";
