@@ -47,12 +47,30 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Provision user database
-  const { url: tursoDbUrl, authToken: tursoDbToken } =
-    await provisionUserDb(username);
+  // Provision user database and create user record
+  // Wrapped in try/catch to release invite code on any failure
+  let userId: string;
+  let tursoDbUrl: string;
+  let tursoDbToken: string;
 
-  // Create user
-  const userId = randomUUID();
+  try {
+    const provisioned = await provisionUserDb(username);
+    tursoDbUrl = provisioned.url;
+    tursoDbToken = provisioned.authToken;
+  } catch (err) {
+    // Turso provisioning failed — release the invite code
+    await adminPrisma.inviteCode.updateMany({
+      where: { code: inviteCode, usedBy: "pending" },
+      data: { usedBy: null, usedAt: null },
+    });
+    console.error("[signup] DB provisioning failed:", err);
+    return Response.json(
+      { error: "Failed to create account. Please try again." },
+      { status: 500 }
+    );
+  }
+
+  userId = randomUUID();
   const passwordHash = await hashPassword(password);
 
   try {
@@ -66,7 +84,9 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch {
-    // Username uniqueness constraint failed — release the invite code
+    // Username uniqueness constraint failed — release invite code
+    // Note: orphaned Turso DB may remain; logged for manual cleanup
+    console.error(`[signup] User creation failed for "${username}". Orphaned Turso DB: ${tursoDbUrl}`);
     await adminPrisma.inviteCode.updateMany({
       where: { code: inviteCode, usedBy: "pending" },
       data: { usedBy: null, usedAt: null },
