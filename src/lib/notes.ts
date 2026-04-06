@@ -37,6 +37,12 @@ export async function getNote(id: string, db: PrismaClient = defaultPrisma): Pro
   return parseNote(raw);
 }
 
+export async function getNotesByIds(ids: string[], db: PrismaClient = defaultPrisma): Promise<Note[]> {
+  if (ids.length === 0) return [];
+  const raw = await db.note.findMany({ where: { id: { in: ids } } });
+  return raw.map(parseNote);
+}
+
 export async function updateNote(
   id: string,
   input: UpdateNoteInput,
