@@ -172,6 +172,13 @@ export default function Home() {
 
   const handleSlashCommand = useCallback(
     (command: SlashCommand, view: EditorView) => {
+      if (command.action === "app:logout") {
+        fetch("/api/auth/logout", { method: "POST" }).then(() => {
+          window.location.href = "/login";
+        });
+        return;
+      }
+
       if (command.action.startsWith("format:")) {
         executeFormatting(view, command.action);
         return;
