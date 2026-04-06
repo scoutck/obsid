@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/db";
+import { prisma as defaultPrisma } from "@/lib/db";
+import type { PrismaClient } from "@prisma/client";
 import { parseNote, parsePersonMeta, type Note, type PersonMeta } from "@/types";
 
 interface CreatePersonInput {
@@ -24,13 +25,14 @@ interface PersonWithCount extends PersonResult {
 }
 
 export async function createPerson(
-  input: CreatePersonInput
+  input: CreatePersonInput,
+  db: PrismaClient = defaultPrisma
 ): Promise<PersonResult> {
   const aliases = [input.name, ...(input.aliases ?? [])];
   // Deduplicate aliases (case-sensitive — the name itself should always appear exactly once)
   const uniqueAliases = [...new Set(aliases)];
 
-  const raw = await prisma.note.create({
+  const raw = await db.note.create({
     data: {
       title: input.name,
       content: input.content ?? "",
@@ -41,7 +43,7 @@ export async function createPerson(
   });
   const note = parseNote(raw);
 
-  const rawMeta = await prisma.personMeta.create({
+  const rawMeta = await db.personMeta.create({
     data: {
       noteId: note.id,
       aliases: JSON.stringify(uniqueAliases),
@@ -54,11 +56,11 @@ export async function createPerson(
   return { note, meta };
 }
 
-export async function getPerson(noteId: string): Promise<PersonResult | null> {
-  const raw = await prisma.note.findUnique({ where: { id: noteId } });
+export async function getPerson(noteId: string, db: PrismaClient = defaultPrisma): Promise<PersonResult | null> {
+  const raw = await db.note.findUnique({ where: { id: noteId } });
   if (!raw) return null;
 
-  const rawMeta = await prisma.personMeta.findUnique({
+  const rawMeta = await db.personMeta.findUnique({
     where: { noteId },
   });
   if (!rawMeta) return null;
@@ -70,11 +72,12 @@ export async function getPerson(noteId: string): Promise<PersonResult | null> {
 }
 
 export async function getPersonByAlias(
-  alias: string
+  alias: string,
+  db: PrismaClient = defaultPrisma
 ): Promise<PersonResult | null> {
   // Fetch all PersonMeta rows and filter by alias case-insensitively.
   // SQLite JSON functions are limited with libsql adapter, so we do this in JS.
-  const allMetas = await prisma.personMeta.findMany();
+  const allMetas = await db.personMeta.findMany();
   const lowerAlias = alias.toLowerCase();
 
   const matches = allMetas.filter((m) => {
@@ -86,7 +89,7 @@ export async function getPersonByAlias(
   if (matches.length !== 1) return null;
 
   const rawMeta = matches[0];
-  const raw = await prisma.note.findUnique({
+  const raw = await db.note.findUnique({
     where: { id: rawMeta.noteId },
   });
   if (!raw) return null;
@@ -97,17 +100,17 @@ export async function getPersonByAlias(
   };
 }
 
-export async function listPeople(): Promise<PersonWithCount[]> {
-  const allMetas = await prisma.personMeta.findMany();
+export async function listPeople(db: PrismaClient = defaultPrisma): Promise<PersonWithCount[]> {
+  const allMetas = await db.personMeta.findMany();
 
   const results: PersonWithCount[] = [];
   for (const rawMeta of allMetas) {
-    const raw = await prisma.note.findUnique({
+    const raw = await db.note.findUnique({
       where: { id: rawMeta.noteId },
     });
     if (!raw) continue;
 
-    const count = await prisma.notePerson.count({
+    const count = await db.notePerson.count({
       where: { personNoteId: rawMeta.noteId },
     });
 
@@ -123,18 +126,19 @@ export async function listPeople(): Promise<PersonWithCount[]> {
 
 export async function updatePerson(
   noteId: string,
-  input: UpdatePersonInput
+  input: UpdatePersonInput,
+  db: PrismaClient = defaultPrisma
 ): Promise<PersonResult> {
   const data: Record<string, unknown> = {};
   if (input.aliases !== undefined) data.aliases = JSON.stringify(input.aliases);
   if (input.role !== undefined) data.role = input.role;
 
-  const rawMeta = await prisma.personMeta.update({
+  const rawMeta = await db.personMeta.update({
     where: { noteId },
     data,
   });
 
-  const raw = await prisma.note.findUniqueOrThrow({
+  const raw = await db.note.findUniqueOrThrow({
     where: { id: noteId },
   });
 
@@ -146,29 +150,30 @@ export async function updatePerson(
 
 export async function addNotePerson(
   noteId: string,
-  personNoteId: string
+  personNoteId: string,
+  db: PrismaClient = defaultPrisma
 ): Promise<void> {
   // Upsert: create if not exists, ignore if already exists
-  const existing = await prisma.notePerson.findUnique({
+  const existing = await db.notePerson.findUnique({
     where: {
       noteId_personNoteId: { noteId, personNoteId },
     },
   });
   if (existing) return;
 
-  await prisma.notePerson.create({
+  await db.notePerson.create({
     data: { noteId, personNoteId },
   });
 }
 
-export async function getNotePeople(noteId: string): Promise<PersonResult[]> {
-  const links = await prisma.notePerson.findMany({
+export async function getNotePeople(noteId: string, db: PrismaClient = defaultPrisma): Promise<PersonResult[]> {
+  const links = await db.notePerson.findMany({
     where: { noteId },
   });
 
   const results: PersonResult[] = [];
   for (const link of links) {
-    const person = await getPerson(link.personNoteId);
+    const person = await getPerson(link.personNoteId, db);
     if (person) results.push(person);
   }
 
@@ -176,15 +181,16 @@ export async function getNotePeople(noteId: string): Promise<PersonResult[]> {
 }
 
 export async function getNotesMentioning(
-  personNoteId: string
+  personNoteId: string,
+  db: PrismaClient = defaultPrisma
 ): Promise<Note[]> {
-  const links = await prisma.notePerson.findMany({
+  const links = await db.notePerson.findMany({
     where: { personNoteId },
   });
 
   const notes: Note[] = [];
   for (const link of links) {
-    const raw = await prisma.note.findUnique({
+    const raw = await db.note.findUnique({
       where: { id: link.noteId },
     });
     if (raw) notes.push(parseNote(raw));
@@ -195,9 +201,10 @@ export async function getNotesMentioning(
 
 export async function updatePersonSummary(
   noteId: string,
-  summary: string
+  summary: string,
+  db: PrismaClient = defaultPrisma
 ): Promise<void> {
-  await prisma.personMeta.update({
+  await db.personMeta.update({
     where: { noteId },
     data: { summary },
   });

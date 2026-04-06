@@ -172,6 +172,13 @@ export default function Home() {
 
   const handleSlashCommand = useCallback(
     (command: SlashCommand, view: EditorView) => {
+      if (command.action === "app:logout") {
+        fetch("/api/auth/logout", { method: "POST" }).then(() => {
+          window.location.href = "/login";
+        });
+        return;
+      }
+
       if (command.action.startsWith("format:")) {
         executeFormatting(view, command.action);
         return;
@@ -525,6 +532,10 @@ export default function Home() {
           });
       } else if (action === "opennote" || action === "note:open") {
         setShowNoteSearch(true);
+      } else if (action === "app:logout") {
+        fetch("/api/auth/logout", { method: "POST" }).then(() => {
+          window.location.href = "/login";
+        });
       }
     },
     []

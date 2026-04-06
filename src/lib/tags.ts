@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/db";
+import { prisma as defaultPrisma } from "@/lib/db";
+import type { PrismaClient } from "@prisma/client";
 
 // Re-export the pure function so server-side code can import from either location
 export { extractInlineTags } from "@/lib/extract-tags";
@@ -12,8 +13,8 @@ export interface TagCount {
  * Query all notes and aggregate tag counts.
  * Returns sorted by count descending.
  */
-export async function getTagVocabulary(): Promise<TagCount[]> {
-  const notes = await prisma.note.findMany({
+export async function getTagVocabulary(db: PrismaClient = defaultPrisma): Promise<TagCount[]> {
+  const notes = await db.note.findMany({
     select: { tags: true },
   });
 

@@ -1,25 +1,28 @@
 import { NextRequest } from "next/server";
+import { getDb } from "@/lib/db";
 import { listPeople, updatePerson, updatePersonSummary } from "@/lib/people";
-import { prisma } from "@/lib/db";
 import { parsePersonMeta } from "@/types";
 
-export async function GET() {
-  const people = await listPeople();
+export async function GET(request: NextRequest) {
+  const db = getDb(request);
+  const people = await listPeople(db);
   return Response.json(people);
 }
 
 export async function PUT(request: NextRequest) {
+  const db = getDb(request);
   const { noteId, aliases, role, summary } = await request.json();
 
   if (summary !== undefined) {
-    await updatePersonSummary(noteId, summary);
+    await updatePersonSummary(noteId, summary, db);
   }
 
-  const updated = await updatePerson(noteId, { aliases, role });
+  const updated = await updatePerson(noteId, { aliases, role }, db);
   return Response.json(updated.meta);
 }
 
 export async function POST(request: NextRequest) {
+  const db = getDb(request);
   const body = await request.json();
 
   if (body.action !== "merge") {
@@ -29,10 +32,10 @@ export async function POST(request: NextRequest) {
   const { targetNoteId, sourceNoteId } = body;
 
   // Fetch both PersonMeta records
-  const targetMeta = await prisma.personMeta.findUnique({
+  const targetMeta = await db.personMeta.findUnique({
     where: { noteId: targetNoteId },
   });
-  const sourceMeta = await prisma.personMeta.findUnique({
+  const sourceMeta = await db.personMeta.findUnique({
     where: { noteId: sourceNoteId },
   });
 
@@ -49,19 +52,19 @@ export async function POST(request: NextRequest) {
   const mergedAliases = [...new Set([...targetAliases, ...sourceAliases])];
 
   // Update target PersonMeta with merged aliases
-  const updatedRaw = await prisma.personMeta.update({
+  const updatedRaw = await db.personMeta.update({
     where: { noteId: targetNoteId },
     data: { aliases: JSON.stringify(mergedAliases) },
   });
 
   // Re-link all NotePerson entries from source to target
-  const sourceLinks = await prisma.notePerson.findMany({
+  const sourceLinks = await db.notePerson.findMany({
     where: { personNoteId: sourceNoteId },
   });
 
   for (const link of sourceLinks) {
     // Upsert: create link to target if it doesn't exist
-    const existing = await prisma.notePerson.findUnique({
+    const existing = await db.notePerson.findUnique({
       where: {
         noteId_personNoteId: {
           noteId: link.noteId,
@@ -70,7 +73,7 @@ export async function POST(request: NextRequest) {
       },
     });
     if (!existing) {
-      await prisma.notePerson.create({
+      await db.notePerson.create({
         data: {
           noteId: link.noteId,
           personNoteId: targetNoteId,
@@ -80,13 +83,13 @@ export async function POST(request: NextRequest) {
   }
 
   // Delete source's NotePerson links, PersonMeta, and Note
-  await prisma.notePerson.deleteMany({
+  await db.notePerson.deleteMany({
     where: { personNoteId: sourceNoteId },
   });
-  await prisma.personMeta.delete({
+  await db.personMeta.delete({
     where: { noteId: sourceNoteId },
   });
-  await prisma.note.delete({
+  await db.note.delete({
     where: { id: sourceNoteId },
   });
 

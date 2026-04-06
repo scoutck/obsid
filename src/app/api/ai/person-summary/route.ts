@@ -1,18 +1,20 @@
 import { NextRequest } from "next/server";
+import { getDb } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { getPerson, getNotesMentioning, updatePersonSummary } from "@/lib/people";
 
 const anthropic = new Anthropic();
 
 export async function POST(request: NextRequest) {
+  const db = getDb(request);
   const { personNoteId } = await request.json();
 
-  const person = await getPerson(personNoteId);
+  const person = await getPerson(personNoteId, db);
   if (!person) {
     return Response.json({ error: "Person not found" }, { status: 404 });
   }
 
-  const connectedNotes = await getNotesMentioning(personNoteId);
+  const connectedNotes = await getNotesMentioning(personNoteId, db);
 
   const noteContext = connectedNotes
     .map((n) => `### ${n.title}\n${n.content.slice(0, 500)}`)
@@ -50,7 +52,7 @@ Write the relationship summary.`;
       if (block.type === "text") summary += block.text;
     }
 
-    await updatePersonSummary(personNoteId, summary.trim());
+    await updatePersonSummary(personNoteId, summary.trim(), db);
 
     return Response.json({ success: true });
   } catch (err) {

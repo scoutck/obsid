@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getDb } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { getNote, conditionalUpdateNote, getRecentNotes, listContextNotes } from "@/lib/notes";
 import { extractInlineTags } from "@/lib/tags";
@@ -20,10 +21,12 @@ interface OrganizeResult {
 }
 
 export async function POST(request: NextRequest) {
+  const db = getDb(request);
+  const cookieHeader = request.headers.get("cookie") ?? "";
   const { noteId, recentSiblingIds } = await request.json();
 
   // Fetch note and snapshot updatedAt for staleness detection
-  const note = await getNote(noteId);
+  const note = await getNote(noteId, db);
   if (!note) {
     return Response.json({ error: "Note not found" }, { status: 404 });
   }
@@ -32,8 +35,8 @@ export async function POST(request: NextRequest) {
 
   // Gather vault context
   const [recentSiblings, people] = await Promise.all([
-    getRecentNotes(recentSiblingIds ?? []),
-    listPeople(),
+    getRecentNotes(recentSiblingIds ?? [], db),
+    listPeople(db),
   ]);
 
   const existingLinks = extractWikiLinks(content);
@@ -41,7 +44,7 @@ export async function POST(request: NextRequest) {
   // Context: 100 most recently edited notes, excluding this note and person notes.
   // Filtered and limited at SQL level for efficiency.
   const personNoteIds = people.map((p) => p.meta.noteId);
-  const contextNotes = await listContextNotes(noteId, personNoteIds);
+  const contextNotes = await listContextNotes(noteId, personNoteIds, 100, db);
 
   const noteTitles = contextNotes
     .map((n) => `- ${n.title || "Untitled"}: ${n.content.slice(0, 100)}`)
@@ -134,9 +137,9 @@ Return JSON in this exact format:
   // Process known people: link existing only
   const resolvedPeople: string[] = [];
   for (const person of result.people) {
-    const existing = await getPersonByAlias(person.name);
+    const existing = await getPersonByAlias(person.name, db);
     if (existing) {
-      await addNotePerson(noteId, existing.note.id);
+      await addNotePerson(noteId, existing.note.id, db);
       resolvedPeople.push(existing.note.title);
     }
   }
@@ -144,7 +147,7 @@ Return JSON in this exact format:
   // Process unresolved people: create PendingPerson entries
   const pendingPeople: string[] = [];
   for (const name of result.unresolvedPeople ?? []) {
-    await createPendingPerson({ name, sourceNoteId: noteId, context: content.slice(0, 200) });
+    await createPendingPerson({ name, sourceNoteId: noteId, context: content.slice(0, 200) }, db);
     pendingPeople.push(name);
   }
 
@@ -158,7 +161,8 @@ Return JSON in this exact format:
     {
       content: updatedContent,
       tags: finalTags,
-    }
+    },
+    db
   );
 
   if (!updated) {
@@ -166,17 +170,20 @@ Return JSON in this exact format:
   }
 
   // Fire-and-forget embedding trigger
-  embedNote(noteId, title, updatedContent).catch((err) =>
+  embedNote(noteId, title, updatedContent, db).catch((err) =>
     console.error("[organize] embedNote failed:", err)
   );
 
   // Fire-and-forget person summary regeneration for newly linked people
   for (const person of result.people) {
-    const linked = await getPersonByAlias(person.name);
+    const linked = await getPersonByAlias(person.name, db);
     if (linked) {
       fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/ai/person-summary`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+        },
         body: JSON.stringify({ personNoteId: linked.note.id }),
       }).catch(() => {});
     }

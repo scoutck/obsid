@@ -38,6 +38,7 @@ export const slashCommands: SlashCommand[] = [
   { label: "Chat Mode", category: "Mode", description: "Switch to chat", action: "mode:chat", mode: "notes" },
   { label: "Notes Mode", category: "Mode", description: "Switch to notes", action: "mode:notes", mode: "chat" },
   { label: "New Chat", category: "Mode", description: "Start a new conversation", action: "mode:new-chat", mode: "chat" },
+  { label: "Logout", category: "Mode", description: "Sign out of Obsid", action: "app:logout" },
 ];
 
 export function filterCommands(query: string, mode?: "notes" | "chat"): SlashCommand[] {

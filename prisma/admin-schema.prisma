@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/admin-client"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  tursoDbUrl   String
+  tursoDbToken String
+  createdAt    DateTime @default(now())
+}
+
+model InviteCode {
+  id        String    @id @default(uuid())
+  code      String    @unique
+  usedBy    String?
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
+}

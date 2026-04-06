@@ -1,22 +1,23 @@
 import { NextRequest } from "next/server";
+import { getDb } from "@/lib/db";
 import { getPerson, getNotesMentioning } from "@/lib/people";
-import { prisma } from "@/lib/db";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const db = getDb(request);
   const { id } = await params;
 
-  const person = await getPerson(id);
+  const person = await getPerson(id, db);
   if (!person) {
     return Response.json({ error: "Person not found" }, { status: 404 });
   }
 
-  const connectedNotes = await getNotesMentioning(id);
+  const connectedNotes = await getNotesMentioning(id, db);
 
   // Get highlights from NotePerson join table
-  const notePersonEntries = await prisma.notePerson.findMany({
+  const notePersonEntries = await db.notePerson.findMany({
     where: { personNoteId: id },
   });
   const highlightMap = new Map(

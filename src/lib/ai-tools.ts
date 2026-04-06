@@ -2,6 +2,8 @@ import { searchNotes, getNote, createNote, updateNote } from "@/lib/notes";
 import { listPeople, getPersonByAlias, addNotePerson } from "@/lib/people";
 import { semanticSearch } from "@/lib/embeddings";
 import { createPendingPerson } from "@/lib/pending-people";
+import { prisma as defaultPrisma } from "@/lib/db";
+import type { PrismaClient } from "@prisma/client";
 import type Anthropic from "@anthropic-ai/sdk";
 
 export const vaultTools: Anthropic.Tool[] = [
@@ -96,16 +98,17 @@ export const vaultTools: Anthropic.Tool[] = [
 export async function executeTool(
   name: string,
   input: Record<string, unknown>,
-  meta?: { sourceNoteId?: string; sourceConversationId?: string }
+  meta?: { sourceNoteId?: string; sourceConversationId?: string; cookie?: string },
+  db: PrismaClient = defaultPrisma
 ): Promise<string> {
   switch (name) {
     case "semantic_search": {
       try {
-        const results = await semanticSearch(input.query as string, (input.limit as number) ?? 10);
+        const results = await semanticSearch(input.query as string, (input.limit as number) ?? 10, db);
         if (results.length === 0) return "No notes found matching that query.";
         const notes = await Promise.all(
           results.map(async (r) => {
-            const note = await getNote(r.noteId);
+            const note = await getNote(r.noteId, db);
             return note
               ? `- **${note.title || "Untitled"}** (id: ${note.id}, relevance: ${(r.score * 100).toFixed(0)}%)\n  Preview: ${note.content.slice(0, 150)}...`
               : null;
@@ -114,14 +117,14 @@ export async function executeTool(
         return notes.filter(Boolean).join("\n\n");
       } catch {
         // Fall back to keyword search
-        const notes = await searchNotes(input.query as string);
+        const notes = await searchNotes(input.query as string, db);
         if (notes.length === 0) return "No notes found matching that query.";
         return notes.slice(0, 10).map((n) => `- **${n.title || "Untitled"}** (id: ${n.id})\n  Preview: ${n.content.slice(0, 150)}...`).join("\n\n");
       }
     }
 
     case "read_note": {
-      const note = await getNote(input.id as string);
+      const note = await getNote(input.id as string, db);
       if (!note) return "Note not found.";
       return `# ${note.title}\n\nTags: ${note.tags.join(", ") || "none"}\nType: ${note.type || "none"}\n\n${note.content}`;
     }
@@ -132,12 +135,12 @@ export async function executeTool(
         content: input.content as string,
         tags: (input.tags as string[]) || [],
         type: (input.type as string) || "",
-      });
+      }, db);
       return `Created note "${note.title}" (id: ${note.id})`;
     }
 
     case "update_note": {
-      const existing = await getNote(input.id as string);
+      const existing = await getNote(input.id as string, db);
       if (!existing) return "Note not found.";
 
       const updates: Record<string, unknown> = {};
@@ -146,12 +149,12 @@ export async function executeTool(
       if (input.append) updates.content = existing.content + "\n" + input.append;
       if (input.tags) updates.tags = input.tags;
 
-      const note = await updateNote(input.id as string, updates);
+      const note = await updateNote(input.id as string, updates, db);
       return `Updated note "${note.title}" (id: ${note.id})`;
     }
 
     case "list_people": {
-      const people = await listPeople();
+      const people = await listPeople(db);
       if (people.length === 0) return "No people tracked yet.";
       return people
         .map(
@@ -162,20 +165,23 @@ export async function executeTool(
     }
 
     case "update_person": {
-      const person = await getPersonByAlias(input.name as string);
+      const person = await getPersonByAlias(input.name as string, db);
       if (!person) return `Person "${input.name}" not found. Consider using create_pending_person to flag this name.`;
-      const existing = await getNote(person.note.id);
+      const existing = await getNote(person.note.id, db);
       if (!existing) return "Person note not found.";
       const timestamp = new Date().toISOString().split("T")[0];
       const appendText = `\n\n_${timestamp}:_ ${input.observation as string}`;
-      await updateNote(person.note.id, { content: existing.content + appendText });
+      await updateNote(person.note.id, { content: existing.content + appendText }, db);
       if (meta?.sourceNoteId) {
-        await addNotePerson(meta.sourceNoteId, person.note.id);
+        await addNotePerson(meta.sourceNoteId, person.note.id, db);
       }
       // Fire-and-forget person summary regeneration
       fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/ai/person-summary`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(meta?.cookie ? { Cookie: meta.cookie } : {}),
+        },
         body: JSON.stringify({ personNoteId: person.note.id }),
       }).catch(() => {});
       return `Added observation to ${person.note.title}'s note`;
@@ -187,7 +193,7 @@ export async function executeTool(
         context: input.context as string,
         sourceNoteId: meta?.sourceNoteId,
         sourceConversationId: meta?.sourceConversationId,
-      });
+      }, db);
       return `Flagged "${input.name}" as pending — user will review`;
     }
 
