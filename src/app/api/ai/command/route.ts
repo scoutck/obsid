@@ -65,7 +65,8 @@ You have tools to search, read, create, and update notes. Execute the user's ins
         if (block.type === "tool_use") {
           const result = await executeTool(
             block.name,
-            block.input as Record<string, unknown>
+            block.input as Record<string, unknown>,
+            { sourceNoteId: noteId }
           );
           toolResults.push({
             type: "tool_result",
