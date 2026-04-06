@@ -12,6 +12,7 @@ export default defineConfig({
     fileParallelism: false,
     env: {
       DATABASE_URL: "file:./prisma/test.db",
+      JWT_SECRET: "test-secret-at-least-32-chars-long",
     },
   },
   resolve: {

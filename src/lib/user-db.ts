@@ -26,7 +26,7 @@ export function getUserDb(url: string, authToken: string): PrismaClient {
       }
     }
     if (oldestKey) {
-      clientCache.get(oldestKey)?.client.$disconnect();
+      void clientCache.get(oldestKey)?.client.$disconnect().catch(() => {});
       clientCache.delete(oldestKey);
     }
   }
