@@ -21,6 +21,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+    return Response.json(
+      { error: "Username can only contain letters, numbers, hyphens, and underscores" },
+      { status: 400 }
+    );
+  }
+
   if (password.length < 8) {
     return Response.json(
       { error: "Password must be at least 8 characters" },
@@ -28,24 +35,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Validate invite code
-  const code = await adminPrisma.inviteCode.findUnique({
-    where: { code: inviteCode },
+  // Atomically claim the invite code (prevents race condition)
+  const claimed = await adminPrisma.inviteCode.updateMany({
+    where: { code: inviteCode, usedBy: null },
+    data: { usedBy: "pending", usedAt: new Date() },
   });
-  if (!code || code.usedBy) {
+  if (claimed.count === 0) {
     return Response.json(
       { error: "Invalid or already used invite code" },
-      { status: 400 }
-    );
-  }
-
-  // Check username availability
-  const existingUser = await adminPrisma.user.findUnique({
-    where: { username },
-  });
-  if (existingUser) {
-    return Response.json(
-      { error: "Username already taken" },
       { status: 400 }
     );
   }
@@ -58,20 +55,32 @@ export async function POST(request: NextRequest) {
   const userId = randomUUID();
   const passwordHash = await hashPassword(password);
 
-  await adminPrisma.user.create({
-    data: {
-      id: userId,
-      username,
-      passwordHash,
-      tursoDbUrl,
-      tursoDbToken,
-    },
-  });
+  try {
+    await adminPrisma.user.create({
+      data: {
+        id: userId,
+        username,
+        passwordHash,
+        tursoDbUrl,
+        tursoDbToken,
+      },
+    });
+  } catch {
+    // Username uniqueness constraint failed — release the invite code
+    await adminPrisma.inviteCode.updateMany({
+      where: { code: inviteCode, usedBy: "pending" },
+      data: { usedBy: null, usedAt: null },
+    });
+    return Response.json(
+      { error: "Username already taken" },
+      { status: 400 }
+    );
+  }
 
-  // Mark invite code as used
+  // Finalize invite code with actual user ID
   await adminPrisma.inviteCode.update({
     where: { code: inviteCode },
-    data: { usedBy: userId, usedAt: new Date() },
+    data: { usedBy: userId },
   });
 
   // Issue JWT

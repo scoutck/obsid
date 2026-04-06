@@ -532,6 +532,10 @@ export default function Home() {
           });
       } else if (action === "opennote" || action === "note:open") {
         setShowNoteSearch(true);
+      } else if (action === "app:logout") {
+        fetch("/api/auth/logout", { method: "POST" }).then(() => {
+          window.location.href = "/login";
+        });
       }
     },
     []

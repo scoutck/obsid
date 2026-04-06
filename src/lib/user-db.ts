@@ -9,7 +9,8 @@ const clientCache = new Map<
 >();
 
 export function getUserDb(url: string, authToken: string): PrismaClient {
-  const existing = clientCache.get(url);
+  const cacheKey = `${url}:${authToken}`;
+  const existing = clientCache.get(cacheKey);
   if (existing) {
     existing.lastUsed = Date.now();
     return existing.client;
@@ -33,6 +34,6 @@ export function getUserDb(url: string, authToken: string): PrismaClient {
 
   const adapter = new PrismaLibSql({ url, authToken });
   const client = new PrismaClient({ adapter });
-  clientCache.set(url, { client, lastUsed: Date.now() });
+  clientCache.set(cacheKey, { client, lastUsed: Date.now() });
   return client;
 }

@@ -130,3 +130,4 @@ Vitest with `fileParallelism: false` (SQLite concurrency). `tests/setup.ts` crea
 - **All lib functions accept optional `db` param.** Every exported function in `notes.ts`, `people.ts`, `conversations.ts`, etc. takes `db: PrismaClient = defaultPrisma` as its last parameter. API routes pass `getDb(request)` for per-user routing.
 - **Multi-user env vars for Vercel.** `ADMIN_DATABASE_URL`, `ADMIN_DATABASE_AUTH_TOKEN`, `TURSO_API_TOKEN`, `TURSO_ORG`, `JWT_SECRET`, `ADMIN_USERNAME`, `NEXT_PUBLIC_BASE_URL`. All set in Vercel dashboard.
 - **Fire-and-forget fetches forward cookies.** `ai-tools.ts` and `organize/route.ts` forward the `Cookie` header in internal person-summary fetches so the proxy can authenticate them.
+- **Turso tokens stored in plaintext in admin DB.** Per-user DB auth tokens are not encrypted at rest. Acceptable for v1 (small trusted group), but encrypt them if the admin DB ever faces broader access.
