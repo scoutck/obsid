@@ -16,6 +16,9 @@ npm run lint         # ESLint
 npx prisma migrate dev --name <name>  # Create migration
 npx tsx prisma/fts-setup.ts           # Set up FTS5 virtual table + triggers
 npx tsx prisma/migrate-commands.ts    # Migrate /claude commands from note content to Command table
+npx tsx scripts/generate-invite.ts   # Generate an invite code (needs ADMIN_DATABASE_URL)
+npx tsx scripts/migrate-all-user-dbs.ts  # Apply migrations to all user databases
+npx prisma generate --schema=prisma/admin-schema.prisma  # Generate admin Prisma client
 ```
 
 ## Architecture
@@ -26,9 +29,23 @@ npx tsx prisma/migrate-commands.ts    # Migrate /claude commands from note conte
 
 `src/app/page.tsx` is the entire app. It manages mode state (`"notes" | "chat"`), note state, auto-save, and all command handlers. In notes mode, the `Editor` component (`src/components/Editor.tsx`) wraps CodeMirror 6 and owns the slash menu. In chat mode, `ChatView` (`src/components/ChatView.tsx`) renders a persistent conversation with Claude. Switch via `/chatmode` and `/notemode` slash commands. There is no sidebar, toolbar, or navigation — everything goes through the `/` slash command menu or keyboard. Slash commands are mode-aware (`slash-commands.ts` has a `mode` field).
 
+### Two-tier database architecture (multi-user)
+
+**Admin database** (single Turso DB): stores users and invite codes. `prisma/admin-schema.prisma` defines the schema, `src/lib/admin-db.ts` provides `adminPrisma` (lazy-initialized proxy to avoid build-time crashes). Admin migrations live in `prisma/admin-migrations/`.
+
+**Per-user databases** (one Turso DB per user): identical schema to the local `prisma/schema.prisma`. Each user gets complete data isolation.
+
+`src/proxy.ts` (Next.js 16 proxy, replaces middleware) checks the JWT cookie, looks up the user's Turso DB credentials in the admin DB, and injects them as `x-user-db-url` / `x-user-db-token` headers. API routes call `getDb(request)` from `src/lib/db.ts` to get the per-user Prisma client. All 8 lib files accept an optional `db: PrismaClient` parameter (defaults to the dev singleton).
+
+`src/lib/user-db.ts` has an LRU cache (max 50) of Prisma clients keyed by Turso URL.
+
+Auth: `src/lib/auth.ts` (bcrypt + JWT). Routes: `/api/auth/signup`, `/api/auth/login`, `/api/auth/logout`. Pages: `/login`, `/signup`. Invite-code gated signup.
+
+Scripts: `scripts/generate-invite.ts` (create invite codes), `scripts/provision-user-db.ts` (create Turso DB + run migrations + FTS5), `scripts/migrate-all-user-dbs.ts` (apply schema changes to all user DBs).
+
 ### Prisma v7 + libsql adapter
 
-This project uses Prisma 7 which requires a driver adapter. `src/lib/db.ts` creates the singleton client with `PrismaLibSql({ url })`. The `@prisma/adapter-libsql` and `@libsql/client` packages are required — don't try to use Prisma without the adapter.
+This project uses Prisma 7 which requires a driver adapter. `src/lib/db.ts` creates the singleton client with `PrismaLibSql({ url })` and exports `getDb(request?)` for per-user DB routing. The `@prisma/adapter-libsql` and `@libsql/client` packages are required — don't try to use Prisma without the adapter.
 
 Tags and links are stored as JSON strings in SQLite (`"[]"`), parsed in `src/types/index.ts` via `parseNote()` / `parseCollection()`. All lib functions return parsed types, not raw DB rows.
 
@@ -108,3 +125,8 @@ Vitest with `fileParallelism: false` (SQLite concurrency). `tests/setup.ts` crea
 - **`VOYAGE_API_KEY` must be set for semantic search.** Without it, embeddings fail silently and search falls back to FTS5. Add to `.env.local`.
 - **Chat messages are not notes.** Chat is stored in `Conversation`/`Message` tables, not in Note content. Don't confuse the two.
 - **Person summaries regenerate on link.** Fire-and-forget POST to `/api/ai/person-summary`. Receives current summary as input to preserve user edits.
+- **`proxy.ts` is Next.js 16 proxy (not middleware).** Next.js 16 renamed `middleware.ts` to `proxy.ts`. The exported function must be named `proxy`. It handles auth + per-user DB header injection.
+- **`adminPrisma` is a lazy proxy.** `src/lib/admin-db.ts` uses a Proxy to defer client creation until first use. This prevents build-time crashes when `ADMIN_DATABASE_URL` isn't set.
+- **All lib functions accept optional `db` param.** Every exported function in `notes.ts`, `people.ts`, `conversations.ts`, etc. takes `db: PrismaClient = defaultPrisma` as its last parameter. API routes pass `getDb(request)` for per-user routing.
+- **Multi-user env vars for Vercel.** `ADMIN_DATABASE_URL`, `ADMIN_DATABASE_AUTH_TOKEN`, `TURSO_API_TOKEN`, `TURSO_ORG`, `JWT_SECRET`, `ADMIN_USERNAME`, `NEXT_PUBLIC_BASE_URL`. All set in Vercel dashboard.
+- **Fire-and-forget fetches forward cookies.** `ai-tools.ts` and `organize/route.ts` forward the `Cookie` header in internal person-summary fetches so the proxy can authenticate them.
