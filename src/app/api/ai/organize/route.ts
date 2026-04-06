@@ -5,8 +5,8 @@ import { getNote, conditionalUpdateNote, getRecentNotes, listContextNotes } from
 import { extractInlineTags } from "@/lib/tags";
 import {
   listPeople,
-  getPersonByAlias,
-  addNotePerson,
+  getPersonsByAliases,
+  addNotePeople,
 } from "@/lib/people";
 import { createPendingPerson } from "@/lib/pending-people";
 import { embedNote } from "@/lib/embeddings";
@@ -134,15 +134,23 @@ Return JSON in this exact format:
     }
   }
 
-  // Process known people: link existing only
+  // Batch resolve all people aliases at once (single DB load)
+  const allAliases = result.people.map((p) => p.name);
+  const aliasResults = await getPersonsByAliases(allAliases, db);
+
+  // Collect resolved person note IDs for batch link creation
   const resolvedPeople: string[] = [];
+  const resolvedPersonNoteIds: string[] = [];
   for (const person of result.people) {
-    const existing = await getPersonByAlias(person.name, db);
+    const existing = aliasResults.get(person.name);
     if (existing) {
-      await addNotePerson(noteId, existing.note.id, db);
       resolvedPeople.push(existing.note.title);
+      resolvedPersonNoteIds.push(existing.note.id);
     }
   }
+
+  // Batch create all note-person links
+  await addNotePeople(noteId, resolvedPersonNoteIds, db);
 
   // Process unresolved people: create PendingPerson entries
   const pendingPeople: string[] = [];
@@ -175,18 +183,15 @@ Return JSON in this exact format:
   );
 
   // Fire-and-forget person summary regeneration for newly linked people
-  for (const person of result.people) {
-    const linked = await getPersonByAlias(person.name, db);
-    if (linked) {
-      fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/ai/person-summary`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-        },
-        body: JSON.stringify({ personNoteId: linked.note.id }),
-      }).catch(() => {});
-    }
+  for (const personNoteId of resolvedPersonNoteIds) {
+    fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/ai/person-summary`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+      },
+      body: JSON.stringify({ personNoteId }),
+    }).catch(() => {});
   }
 
   return Response.json({
