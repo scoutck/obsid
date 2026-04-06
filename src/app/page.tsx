@@ -11,8 +11,12 @@ const CollectionModal = dynamic(() => import("@/components/CollectionModal"));
 const PeopleModal = dynamic(() => import("@/components/PeopleModal"));
 const AiPrompt = dynamic(() => import("@/components/AiPrompt"));
 const AiResponseBlock = dynamic(() => import("@/components/AiResponseBlock"));
-const ChatView = dynamic(() => import("@/components/ChatView"));
-const PersonPage = dynamic(() => import("@/components/PersonPage"));
+const ChatView = dynamic(() => import("@/components/ChatView"), {
+  loading: () => <div className="flex items-center justify-center h-full"><p className="text-zinc-500">Loading...</p></div>,
+});
+const PersonPage = dynamic(() => import("@/components/PersonPage"), {
+  loading: () => <div className="flex items-center justify-center h-full"><p className="text-zinc-500">Loading...</p></div>,
+});
 const NewPersonFlow = dynamic(() => import("@/components/NewPersonFlow"));
 const PendingPeopleModal = dynamic(() => import("@/components/PendingPeopleModal"));
 import { executeFormatting } from "@/editor/formatting";
