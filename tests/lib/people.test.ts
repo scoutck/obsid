@@ -2,8 +2,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   createPerson,
   getPersonByAlias,
+  getPersonsByAliases,
   listPeople,
   addNotePerson,
+  addNotePeople,
   getNotePeople,
   getNotesMentioning,
 } from "@/lib/people";
@@ -104,5 +106,39 @@ describe("getNotesMentioning", () => {
 
     const notes = await getNotesMentioning(person.note.id);
     expect(notes).toHaveLength(2);
+  });
+});
+
+describe("getPersonsByAliases", () => {
+  it("resolves multiple aliases in one call", async () => {
+    await createPerson({ name: "Sarah Chen", aliases: ["Sarah"] });
+    await createPerson({ name: "John Doe", aliases: ["John"] });
+
+    const results = await getPersonsByAliases(["sarah", "John Doe", "Nobody"]);
+    expect(results.get("sarah")?.note.title).toBe("Sarah Chen");
+    expect(results.get("John Doe")?.note.title).toBe("John Doe");
+    expect(results.get("Nobody")).toBeNull();
+  });
+});
+
+describe("addNotePeople", () => {
+  it("batch links multiple people to a note", async () => {
+    const sarah = await createPerson({ name: "Sarah Chen" });
+    const john = await createPerson({ name: "John Doe" });
+    const note = await createNote({ title: "Meeting" });
+
+    await addNotePeople(note.id, [sarah.note.id, john.note.id]);
+    const people = await getNotePeople(note.id);
+    expect(people).toHaveLength(2);
+  });
+
+  it("skips duplicates", async () => {
+    const sarah = await createPerson({ name: "Sarah Chen" });
+    const note = await createNote({ title: "Meeting" });
+
+    await addNotePerson(note.id, sarah.note.id);
+    await addNotePeople(note.id, [sarah.note.id]);
+    const people = await getNotePeople(note.id);
+    expect(people).toHaveLength(1);
   });
 });

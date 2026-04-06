@@ -100,27 +100,77 @@ export async function getPersonByAlias(
   };
 }
 
+export async function getPersonsByAliases(
+  aliases: string[],
+  db: PrismaClient = defaultPrisma
+): Promise<Map<string, PersonResult | null>> {
+  const allMetas = await db.personMeta.findMany();
+  const result = new Map<string, PersonResult | null>();
+
+  const metaAliases = allMetas.map((m) => ({
+    meta: m,
+    aliases: (JSON.parse(m.aliases) as string[]).map((a) => a.toLowerCase()),
+  }));
+
+  const neededNoteIds = new Set<string>();
+  for (const alias of aliases) {
+    const lower = alias.toLowerCase();
+    const matches = metaAliases.filter((m) => m.aliases.includes(lower));
+    if (matches.length === 1) neededNoteIds.add(matches[0].meta.noteId);
+  }
+
+  const notes =
+    neededNoteIds.size > 0
+      ? await db.note.findMany({ where: { id: { in: [...neededNoteIds] } } })
+      : [];
+  const noteMap = new Map(notes.map((n) => [n.id, n]));
+
+  for (const alias of aliases) {
+    const lower = alias.toLowerCase();
+    const matches = metaAliases.filter((m) => m.aliases.includes(lower));
+    if (matches.length !== 1) {
+      result.set(alias, null);
+      continue;
+    }
+    const rawMeta = matches[0].meta;
+    const raw = noteMap.get(rawMeta.noteId);
+    if (!raw) {
+      result.set(alias, null);
+      continue;
+    }
+    result.set(alias, { note: parseNote(raw), meta: parsePersonMeta(rawMeta) });
+  }
+  return result;
+}
+
 export async function listPeople(db: PrismaClient = defaultPrisma): Promise<PersonWithCount[]> {
   const allMetas = await db.personMeta.findMany();
+  if (allMetas.length === 0) return [];
+
+  const noteIds = allMetas.map((m) => m.noteId);
+
+  // Batch fetch all person notes and mention counts in parallel
+  const [rawNotes, countRows] = await Promise.all([
+    db.note.findMany({ where: { id: { in: noteIds } } }),
+    db.$queryRawUnsafe<Array<{ personNoteId: string; cnt: number }>>(
+      `SELECT personNoteId, COUNT(*) as cnt FROM "NotePerson" WHERE personNoteId IN (${noteIds.map(() => "?").join(",")}) GROUP BY personNoteId`,
+      ...noteIds
+    ),
+  ]);
+
+  const noteMap = new Map(rawNotes.map((n) => [n.id, n]));
+  const countMap = new Map(countRows.map((c) => [c.personNoteId, Number(c.cnt)]));
 
   const results: PersonWithCount[] = [];
   for (const rawMeta of allMetas) {
-    const raw = await db.note.findUnique({
-      where: { id: rawMeta.noteId },
-    });
+    const raw = noteMap.get(rawMeta.noteId);
     if (!raw) continue;
-
-    const count = await db.notePerson.count({
-      where: { personNoteId: rawMeta.noteId },
-    });
-
     results.push({
       note: parseNote(raw),
       meta: parsePersonMeta(rawMeta),
-      noteCount: count,
+      noteCount: countMap.get(rawMeta.noteId) ?? 0,
     });
   }
-
   return results;
 }
 
@@ -166,17 +216,46 @@ export async function addNotePerson(
   });
 }
 
-export async function getNotePeople(noteId: string, db: PrismaClient = defaultPrisma): Promise<PersonResult[]> {
-  const links = await db.notePerson.findMany({
-    where: { noteId },
+export async function addNotePeople(
+  noteId: string,
+  personNoteIds: string[],
+  db: PrismaClient = defaultPrisma
+): Promise<void> {
+  if (personNoteIds.length === 0) return;
+
+  const existing = await db.notePerson.findMany({
+    where: { noteId, personNoteId: { in: personNoteIds } },
   });
+  const existingSet = new Set(existing.map((e) => e.personNoteId));
+  const newIds = personNoteIds.filter((id) => !existingSet.has(id));
+  if (newIds.length === 0) return;
+
+  await db.notePerson.createMany({
+    data: newIds.map((personNoteId) => ({ noteId, personNoteId })),
+  });
+}
+
+export async function getNotePeople(noteId: string, db: PrismaClient = defaultPrisma): Promise<PersonResult[]> {
+  const links = await db.notePerson.findMany({ where: { noteId } });
+  if (links.length === 0) return [];
+
+  const personNoteIds = links.map((l) => l.personNoteId);
+  const [rawNotes, rawMetas] = await Promise.all([
+    db.note.findMany({ where: { id: { in: personNoteIds } } }),
+    db.personMeta.findMany({ where: { noteId: { in: personNoteIds } } }),
+  ]);
+
+  const noteMap = new Map(rawNotes.map((n) => [n.id, n]));
+  const metaMap = new Map(rawMetas.map((m) => [m.noteId, m]));
 
   const results: PersonResult[] = [];
-  for (const link of links) {
-    const person = await getPerson(link.personNoteId, db);
-    if (person) results.push(person);
+  for (const id of personNoteIds) {
+    const raw = noteMap.get(id);
+    const rawMeta = metaMap.get(id);
+    if (raw && rawMeta) {
+      results.push({ note: parseNote(raw), meta: parsePersonMeta(rawMeta) });
+    }
   }
-
   return results;
 }
 
@@ -184,19 +263,12 @@ export async function getNotesMentioning(
   personNoteId: string,
   db: PrismaClient = defaultPrisma
 ): Promise<Note[]> {
-  const links = await db.notePerson.findMany({
-    where: { personNoteId },
-  });
+  const links = await db.notePerson.findMany({ where: { personNoteId } });
+  if (links.length === 0) return [];
 
-  const notes: Note[] = [];
-  for (const link of links) {
-    const raw = await db.note.findUnique({
-      where: { id: link.noteId },
-    });
-    if (raw) notes.push(parseNote(raw));
-  }
-
-  return notes;
+  const noteIds = links.map((l) => l.noteId);
+  const rawNotes = await db.note.findMany({ where: { id: { in: noteIds } } });
+  return rawNotes.map(parseNote);
 }
 
 export async function updatePersonSummary(
