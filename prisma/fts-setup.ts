@@ -2,7 +2,8 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 
 const url = process.env.DATABASE_URL ?? "file:./dev.db";
-const adapter = new PrismaLibSql({ url });
+const authToken = process.env.DATABASE_AUTH_TOKEN ?? undefined;
+const adapter = new PrismaLibSql({ url, authToken });
 const prisma = new PrismaClient({ adapter });
 
 async function setupFTS() {
