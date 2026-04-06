@@ -9,17 +9,16 @@ export async function GET(
   const db = getDb(request);
   const { id } = await params;
 
-  const person = await getPerson(id, db);
+  // Fetch person, connected notes, and highlights in parallel
+  const [person, connectedNotes, notePersonEntries] = await Promise.all([
+    getPerson(id, db),
+    getNotesMentioning(id, db),
+    db.notePerson.findMany({ where: { personNoteId: id } }),
+  ]);
+
   if (!person) {
     return Response.json({ error: "Person not found" }, { status: 404 });
   }
-
-  const connectedNotes = await getNotesMentioning(id, db);
-
-  // Get highlights from NotePerson join table
-  const notePersonEntries = await db.notePerson.findMany({
-    where: { personNoteId: id },
-  });
   const highlightMap = new Map(
     notePersonEntries.map((np) => [np.noteId, np.highlight])
   );

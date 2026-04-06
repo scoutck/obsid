@@ -31,11 +31,11 @@ export async function POST(request: NextRequest) {
     await updateConversationTitle(conversationId, title, db);
   }
 
-  // Load conversation history
-  const history = await getMessages(conversationId, 20, db);
-
-  // Build people context
-  const people = await listPeople(db);
+  // Load conversation history and people context in parallel
+  const [history, people] = await Promise.all([
+    getMessages(conversationId, 20, db),
+    listPeople(db),
+  ]);
   const peopleList = people
     .map(
       (p) =>
