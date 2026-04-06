@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { listPeople, updatePerson } from "@/lib/people";
+import { listPeople, updatePerson, updatePersonSummary } from "@/lib/people";
 import { prisma } from "@/lib/db";
 import { parsePersonMeta } from "@/types";
 
@@ -9,7 +9,12 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
-  const { noteId, aliases, role } = await request.json();
+  const { noteId, aliases, role, summary } = await request.json();
+
+  if (summary !== undefined) {
+    await updatePersonSummary(noteId, summary);
+  }
+
   const updated = await updatePerson(noteId, { aliases, role });
   return Response.json(updated.meta);
 }
