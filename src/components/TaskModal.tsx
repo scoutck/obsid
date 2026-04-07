@@ -44,6 +44,7 @@ export default function TaskModal({ onNavigateToNote, onClose }: TaskModalProps)
     })));
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchPeople(); }, [fetchPeople]);
 
   useEffect(() => {

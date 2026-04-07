@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from "vitest";
+import type { NextRequest } from "next/server";
 import { createTask, getTasks } from "@/lib/tasks";
 import { createNote } from "@/lib/notes";
 import { prisma } from "@/lib/db";
@@ -18,7 +19,7 @@ describe("GET /api/tasks", () => {
 
     const { GET } = await import("@/app/api/tasks/route");
     const request = new Request("http://localhost/api/tasks");
-    const response = await GET(request as any);
+    const response = await GET(request as unknown as NextRequest);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -32,7 +33,7 @@ describe("GET /api/tasks", () => {
 
     const { GET } = await import("@/app/api/tasks/route");
     const request = new Request(`http://localhost/api/tasks?noteId=${note.id}`);
-    const response = await GET(request as any);
+    const response = await GET(request as unknown as NextRequest);
     const data = await response.json();
 
     expect(data).toHaveLength(1);
@@ -45,7 +46,7 @@ describe("GET /api/tasks", () => {
 
     const { GET } = await import("@/app/api/tasks/route");
     const request = new Request("http://localhost/api/tasks?q=grocer");
-    const response = await GET(request as any);
+    const response = await GET(request as unknown as NextRequest);
     const data = await response.json();
 
     expect(data).toHaveLength(1);
@@ -61,7 +62,7 @@ describe("POST /api/tasks", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "New task" }),
     });
-    const response = await POST(request as any);
+    const response = await POST(request as unknown as NextRequest);
     const data = await response.json();
 
     expect(response.status).toBe(201);
@@ -80,7 +81,7 @@ describe("PATCH /api/tasks/[id]", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ completed: true }),
     });
-    const response = await PATCH(request as any, {
+    const response = await PATCH(request as unknown as NextRequest, {
       params: Promise.resolve({ id: task.id }),
     });
     const data = await response.json();
@@ -97,7 +98,7 @@ describe("DELETE /api/tasks/[id]", () => {
     const request = new Request(`http://localhost/api/tasks/${task.id}`, {
       method: "DELETE",
     });
-    const response = await DELETE(request as any, {
+    const response = await DELETE(request as unknown as NextRequest, {
       params: Promise.resolve({ id: task.id }),
     });
     const data = await response.json();
