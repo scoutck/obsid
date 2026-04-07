@@ -25,14 +25,9 @@ describe("Race Conditions", () => {
         conditionalUpdateNote(note.id, note.updatedAt, { content: "update B" }),
       ]);
 
-      // BUG: conditionalUpdateNote always returns false due to timestamp
-      // format mismatch — neither update succeeds
+      // With the fix, exactly one should succeed (optimistic locking works)
       const successes = [resultA, resultB].filter(Boolean);
-      if (successes.length === 0) {
-        console.warn("BUG CONFIRMED: conditionalUpdateNote always fails — 0 of 2 concurrent updates succeeded");
-      }
-      // Document actual broken behavior: 0 successes (should be 1)
-      expect(successes).toHaveLength(0);
+      expect(successes).toHaveLength(1);
     });
   });
 
