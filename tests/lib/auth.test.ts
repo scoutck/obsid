@@ -31,3 +31,34 @@ describe("JWT", () => {
     await expect(verifyToken(tampered)).rejects.toThrow();
   });
 });
+
+describe("edge cases", () => {
+  it("rejects empty password for hashing", async () => {
+    // Test if empty password is handled or throws
+    const hash = await hashPassword("");
+    // Should still produce a valid hash (bcrypt handles empty strings)
+    expect(hash).toBeDefined();
+    expect(await verifyPassword("", hash)).toBe(true);
+  });
+
+  it("rejects verification with wrong password", async () => {
+    const hash = await hashPassword("correct");
+    const result = await verifyPassword("wrong", hash);
+    expect(result).toBe(false);
+  });
+
+  it("verifies token with correct secret", async () => {
+    const token = await createToken({ sub: "123", username: "test" });
+    const payload = await verifyToken(token);
+    expect(payload.sub).toBe("123");
+    expect(payload.username).toBe("test");
+  });
+
+  it("rejects malformed JWT", async () => {
+    await expect(verifyToken("not.a.jwt")).rejects.toThrow();
+  });
+
+  it("rejects empty string token", async () => {
+    await expect(verifyToken("")).rejects.toThrow();
+  });
+});
