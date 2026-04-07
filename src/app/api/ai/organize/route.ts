@@ -77,7 +77,7 @@ ${peopleList || "(none yet)"}
 
 ## Rules
 - Only suggest links to notes that actually exist in the vault (match by title).
-- For people: match names against known aliases (case-insensitive).
+- For people: match names in the note against known aliases (case-insensitive). In the "people" array, use the person's primary name exactly as listed in "Known people" above (the name before the parentheses), NOT the name variant found in the note text.
 - If a name is ambiguous or doesn't match any known person, put it in unresolvedPeople.
 - Return valid JSON only, no markdown wrapping.`;
 

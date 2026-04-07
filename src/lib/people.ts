@@ -127,7 +127,16 @@ export async function getPersonsByAliases(
 
   for (const alias of aliases) {
     const lower = alias.toLowerCase();
-    const matches = metaAliases.filter((m) => m.aliases.includes(lower));
+    let matches = metaAliases.filter((m) => m.aliases.includes(lower));
+
+    // Fallback: if no exact alias match, check if input starts with a stored alias
+    // or vice versa at a word boundary (e.g., "Ashley Beresid" matches stored "Ashley")
+    if (matches.length === 0) {
+      matches = metaAliases.filter((m) =>
+        m.aliases.some((a) => lower.startsWith(a + " ") || a.startsWith(lower + " "))
+      );
+    }
+
     if (matches.length !== 1) {
       result.set(alias, null);
       continue;
