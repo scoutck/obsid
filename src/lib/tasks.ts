@@ -63,15 +63,13 @@ export async function getTask(
 export async function getTasks(
   db: PrismaClient = defaultPrisma
 ): Promise<Task[]> {
-  const incomplete = await db.task.findMany({
-    where: { completed: false },
-    orderBy: { createdAt: "desc" },
+  const raw = await db.task.findMany({
+    orderBy: [
+      { completed: "asc" },
+      { createdAt: "desc" },
+    ],
   });
-  const completed = await db.task.findMany({
-    where: { completed: true },
-    orderBy: { createdAt: "desc" },
-  });
-  return [...incomplete, ...completed].map(parseTask);
+  return raw.map(parseTask);
 }
 
 export async function getTasksForNote(

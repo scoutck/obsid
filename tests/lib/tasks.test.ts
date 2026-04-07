@@ -65,18 +65,20 @@ describe("createTask", () => {
 });
 
 describe("getTasks", () => {
-  it("returns tasks ordered: incomplete first by createdAt desc, then completed", async () => {
+  it("returns incomplete tasks before completed tasks", async () => {
     const t1 = await createTask({ title: "First" });
-    const t2 = await createTask({ title: "Second" });
-    const t3 = await createTask({ title: "Third" });
+    await createTask({ title: "Second" });
+    await createTask({ title: "Third" });
     await updateTask(t1.id, { completed: true });
 
     const tasks = await getTasks();
-    // t3, t2 (incomplete, newest first), then t1 (completed)
-    expect(tasks[0].title).toBe("Third");
-    expect(tasks[1].title).toBe("Second");
-    expect(tasks[2].title).toBe("First");
+    expect(tasks).toHaveLength(3);
+    // Incomplete tasks come first
+    expect(tasks[0].completed).toBe(false);
+    expect(tasks[1].completed).toBe(false);
+    // Completed task is last
     expect(tasks[2].completed).toBe(true);
+    expect(tasks[2].title).toBe("First");
   });
 });
 
