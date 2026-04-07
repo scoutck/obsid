@@ -49,6 +49,14 @@ export async function DELETE(
     where: { sourceNoteId: id },
     data: { sourceNoteId: null },
   });
+  await db.task.updateMany({
+    where: { noteId: id },
+    data: { noteId: null },
+  });
+  await db.task.updateMany({
+    where: { personNoteId: id },
+    data: { personNoteId: null },
+  });
   await deleteNote(id, db);
   return NextResponse.json({ success: true });
 }
