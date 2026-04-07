@@ -74,6 +74,24 @@ export interface PendingPerson {
   createdAt: Date;
 }
 
+function safeParseArray(json: string): string[] {
+  try {
+    const parsed = JSON.parse(json);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function safeParseJson<T>(json: string, fallback: T): T {
+  try {
+    const parsed = JSON.parse(json);
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function parseNote(raw: {
   id: string;
   title: string;
@@ -89,9 +107,9 @@ export function parseNote(raw: {
     id: raw.id,
     title: raw.title,
     content: raw.content,
-    tags: JSON.parse(raw.tags),
+    tags: safeParseArray(raw.tags),
     type: raw.type,
-    links: JSON.parse(raw.links),
+    links: safeParseArray(raw.links),
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
   };
@@ -109,7 +127,7 @@ export function parsePersonMeta(raw: {
 }): PersonMeta {
   return {
     ...raw,
-    aliases: JSON.parse(raw.aliases),
+    aliases: safeParseArray(raw.aliases),
   };
 }
 
@@ -121,7 +139,7 @@ export function parseCollection(raw: {
 }): Collection {
   return {
     ...raw,
-    filter: JSON.parse(raw.filter),
+    filter: safeParseJson(raw.filter, {}),
   };
 }
 
@@ -136,6 +154,6 @@ export function parseChatMessage(raw: {
   return {
     ...raw,
     role: raw.role as "user" | "assistant",
-    toolCalls: JSON.parse(raw.toolCalls),
+    toolCalls: safeParseJson(raw.toolCalls, []),
   };
 }

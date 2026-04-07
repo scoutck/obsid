@@ -16,7 +16,7 @@ beforeEach(async () => {
 
 describe("JSON Corruption Resilience", () => {
   describe("parseNote", () => {
-    it("crashes on malformed tags JSON (BUG CHECK)", () => {
+    it("gracefully handles malformed tags JSON (BUG-004 fixed)", () => {
       const raw = {
         id: "test-1",
         title: "Test",
@@ -27,11 +27,11 @@ describe("JSON Corruption Resilience", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      // This documents the expected crash — no try-catch in parseNote
-      expect(() => parseNote(raw)).toThrow();
+      const note = parseNote(raw);
+      expect(note.tags).toEqual([]);
     });
 
-    it("crashes on malformed links JSON (BUG CHECK)", () => {
+    it("gracefully handles malformed links JSON (BUG-004 fixed)", () => {
       const raw = {
         id: "test-1",
         title: "Test",
@@ -42,7 +42,8 @@ describe("JSON Corruption Resilience", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      expect(() => parseNote(raw)).toThrow();
+      const note = parseNote(raw);
+      expect(note.links).toEqual([]);
     });
 
     it("handles empty string tags", () => {
@@ -56,8 +57,8 @@ describe("JSON Corruption Resilience", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      // Empty string is not valid JSON — should crash
-      expect(() => parseNote(raw)).toThrow();
+      const note = parseNote(raw);
+      expect(note.tags).toEqual([]);
     });
 
     it("handles null-ish values in JSON fields", () => {
@@ -71,15 +72,14 @@ describe("JSON Corruption Resilience", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      // JSON.parse("null") returns null — but code expects arrays
       const note = parseNote(raw);
-      // This checks if null tags would cause downstream issues
-      expect(note.tags).toBeNull();
+      expect(note.tags).toEqual([]);
+      expect(note.links).toEqual([]);
     });
   });
 
   describe("parsePersonMeta", () => {
-    it("crashes on malformed aliases JSON (BUG CHECK)", () => {
+    it("gracefully handles malformed aliases JSON (BUG-004 fixed)", () => {
       const raw = {
         id: "meta-1",
         noteId: "note-1",
@@ -90,12 +90,13 @@ describe("JSON Corruption Resilience", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      expect(() => parsePersonMeta(raw)).toThrow();
+      const meta = parsePersonMeta(raw);
+      expect(meta.aliases).toEqual([]);
     });
   });
 
   describe("parseChatMessage", () => {
-    it("crashes on malformed toolCalls JSON (BUG CHECK)", () => {
+    it("gracefully handles malformed toolCalls JSON (BUG-004 fixed)", () => {
       const raw = {
         id: "msg-1",
         conversationId: "conv-1",
@@ -104,13 +105,13 @@ describe("JSON Corruption Resilience", () => {
         toolCalls: "{bad json}",
         createdAt: new Date(),
       };
-      expect(() => parseChatMessage(raw)).toThrow();
+      const msg = parseChatMessage(raw);
+      expect(msg.toolCalls).toEqual([]);
     });
   });
 
   describe("DB-level corruption", () => {
-    it("corrupted tags in DB cause getNote to crash", async () => {
-      // Insert note with valid JSON first
+    it("corrupted tags in DB gracefully return empty array (BUG-004 fixed)", async () => {
       const note = await prisma.note.create({
         data: {
           title: "Corrupted",
@@ -121,15 +122,15 @@ describe("JSON Corruption Resilience", () => {
         },
       });
 
-      // Corrupt the tags field directly via raw SQL
       await prisma.$executeRawUnsafe(
         `UPDATE "Note" SET tags = 'INVALID' WHERE id = ?`,
         note.id
       );
 
-      // Now try to read via the lib function
       const { getNote } = await import("@/lib/notes");
-      await expect(getNote(note.id)).rejects.toThrow();
+      const fetched = await getNote(note.id);
+      expect(fetched).not.toBeNull();
+      expect(fetched!.tags).toEqual([]);
     });
   });
 });

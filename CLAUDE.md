@@ -105,6 +105,13 @@ Tags are inline `#tag` text in note content — content is the source of truth. 
 
 Vitest with `fileParallelism: false` (SQLite concurrency). `tests/setup.ts` creates a fresh `prisma/test.db` by applying all migrations in `prisma/migrations/` (sorted, sequential). Tests hit a real database, not mocks.
 
+**Test patterns:**
+- Import `{ prisma } from "@/lib/db"` for direct DB access in tests (uses test.db singleton).
+- Create test data via lib functions (`createNote()`, `createPerson()`), not raw Prisma calls.
+- `beforeEach` cleanup must respect FK constraints — delete in order: `notePerson` → `personMeta` → `pendingPerson` → `command` → `embedding` → `message` → `conversation` → `note`.
+- Test directories: `tests/lib/` (unit), `tests/api/` (API), `tests/editor/` (editor), `tests/workflows/` (integration), `tests/edge-cases/` (stress tests), `tests/e2e/` (Playwright).
+- FTS5 table doesn't exist in test DB — `searchNotes()` always uses LIKE fallback in tests.
+
 ### State management pattern
 
 `page.tsx` uses a `contentRef` (not `content` state) for the auto-save callback to avoid re-rendering the entire component tree on every keystroke. The Editor's `useEffect` has `[]` deps — it creates the CodeMirror instance once. Note switching uses `key={noteId}` to force a full remount.
@@ -140,4 +147,6 @@ Vitest with `fileParallelism: false` (SQLite concurrency). `tests/setup.ts` crea
 - **Never loop with individual queries.** Use `findMany({ where: { id: { in: ids } } })` + a Map instead of looping with `findUnique`. Use `Promise.all` for independent awaits in API routes. This is how every N+1 in `people.ts` was introduced.
 - **Batch helpers exist — use them.** `getPersonsByAliases(aliases, db)` resolves multiple aliases with one DB load (vs `getPersonByAlias` per alias). `addNotePeople(noteId, personNoteIds, db)` batch-creates links. `getNotesByIds(ids, db)` batch-fetches notes. Prefer these over sequential single-item calls.
 - **Dev mode skips remote Turso routing.** The proxy bypasses `getUserCredentials` + header injection when `NODE_ENV !== "production"`, so `getDb()` falls through to local `dev.db`. Without this, every local dev query round-trips to remote Turso (~20s page loads).
+- **DELETE `/api/notes/[id]` cascade order matters.** The handler cleans up: commands → embeddings → notePerson (both `noteId` and `personNoteId` directions) → personMeta → pendingPerson (nullify sourceNoteId) → note. All directions are covered — follow this order when adding new related tables.
+- **Parse functions use safe JSON helpers.** `parseNote()`, `parsePersonMeta()`, `parseChatMessage()` use `safeParseArray()`/`safeParseJson()` from `src/types/index.ts`. Malformed JSON returns fallback values (empty arrays/objects) instead of throwing.
 - **Modal components use `next/dynamic`.** All conditionally-rendered components in `page.tsx` (modals, ChatView, PersonPage) are lazy-loaded. New modal/overlay components should follow the same pattern. Editor and Toast are static imports (always rendered / tiny).

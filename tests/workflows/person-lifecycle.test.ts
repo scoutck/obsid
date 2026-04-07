@@ -202,24 +202,21 @@ describe("Person Lifecycle", () => {
   });
 
   describe("person deletion cleanup", () => {
-    it("deleting person note leaves PersonMeta orphaned (BUG CHECK)", async () => {
+    it("deleting person note cleans up PersonMeta (BUG-002 fixed)", async () => {
       const person = await createPerson({ name: "Sarah" });
       const personNoteId = person.note.id;
 
-      // Delete the note directly (simulating DELETE API route without PersonMeta cleanup)
+      // Simulate the fixed DELETE API route cascade
+      await prisma.notePerson.deleteMany({ where: { noteId: personNoteId } });
       await prisma.notePerson.deleteMany({ where: { personNoteId } });
+      await prisma.personMeta.deleteMany({ where: { noteId: personNoteId } });
       await deleteNote(personNoteId);
 
-      // Check if PersonMeta still exists — THIS IS THE SUSPECTED BUG
-      const orphanedMeta = await prisma.personMeta.findUnique({
+      // PersonMeta should now be cleaned up
+      const meta = await prisma.personMeta.findUnique({
         where: { noteId: personNoteId },
       });
-      // If this passes, the bug is confirmed: PersonMeta is orphaned
-      if (orphanedMeta) {
-        console.warn("BUG CONFIRMED: PersonMeta orphaned after note delete");
-      }
-      // The test documents the current behavior — we expect the bug
-      expect(orphanedMeta).not.toBeNull(); // Documents the bug: meta IS orphaned
+      expect(meta).toBeNull();
     });
   });
 });

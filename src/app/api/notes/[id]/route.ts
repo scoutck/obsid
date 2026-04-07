@@ -43,6 +43,8 @@ export async function DELETE(
   await deleteCommandsForNote(id, db);
   await db.embedding.deleteMany({ where: { noteId: id } });
   await db.notePerson.deleteMany({ where: { noteId: id } });
+  await db.notePerson.deleteMany({ where: { personNoteId: id } });
+  await db.personMeta.deleteMany({ where: { noteId: id } });
   await db.pendingPerson.updateMany({
     where: { sourceNoteId: id },
     data: { sourceNoteId: null },
