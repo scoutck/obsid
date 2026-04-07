@@ -13,6 +13,7 @@ npm test             # Run all tests (vitest, sequential)
 npm test -- tests/lib/notes.test.ts  # Run single test file
 npx tsc --noEmit     # Type check without emitting
 npm run lint         # ESLint
+npx playwright test  # Run E2E tests (separate from vitest)
 npx prisma migrate dev --name <name>  # Create migration
 npx tsx prisma/fts-setup.ts           # Set up FTS5 virtual table + triggers
 npx tsx prisma/migrate-commands.ts    # Migrate /claude commands from note content to Command table
@@ -35,7 +36,7 @@ npx prisma generate --schema=prisma/admin-schema.prisma  # Generate admin Prisma
 
 **Per-user databases** (one Turso DB per user): identical schema to the local `prisma/schema.prisma`. Each user gets complete data isolation.
 
-`src/proxy.ts` (Next.js 16 proxy, replaces middleware) checks the JWT cookie, looks up the user's Turso DB credentials in the admin DB, and injects them as `x-user-db-url` / `x-user-db-token` headers. API routes call `getDb(request)` from `src/lib/db.ts` to get the per-user Prisma client. All 8 lib files accept an optional `db: PrismaClient` parameter (defaults to the dev singleton).
+`src/proxy.ts` (Next.js 16 proxy, replaces middleware) checks the JWT cookie, looks up the user's Turso DB credentials in the admin DB, and injects them as `x-user-db-url` / `x-user-db-token` headers. API routes call `getDb(request)` from `src/lib/db.ts` to get the per-user Prisma client. All 14 lib files accept an optional `db: PrismaClient` parameter (defaults to the dev singleton).
 
 `src/lib/user-db.ts` has an LRU cache (max 50) of Prisma clients keyed by Turso URL.
 
@@ -128,7 +129,7 @@ Vitest with `fileParallelism: false` (SQLite concurrency). `tests/setup.ts` crea
 - **`prisma generate` after schema changes.** The dev server uses the generated client — if you add models/fields and only run migrate, the runtime client is stale. Always run `npx prisma generate` after migrations.
 - **Client/server import boundary for pure functions.** `extractInlineTags` lives in `src/lib/extract-tags.ts` (no Prisma import) so `page.tsx` can use it. `src/lib/tags.ts` re-exports it for server use. Don't import `src/lib/tags.ts` from client components — it pulls in Prisma.
 - **`/claude` Enter key removes the line from content.** The custom Enter keymap detects `/claude <instruction>`, deletes the line, stores a Command in the DB, and adds a widget decoration via `addCommandEffect`. The command text never persists in note content.
-- **Use ISO strings for raw SQL timestamps, not `CURRENT_TIMESTAMP`.** Prisma writes `@updatedAt` as ISO strings (`2026-04-05T22:00:00.123Z`). SQLite's `CURRENT_TIMESTAMP` produces `2026-04-05 22:00:00` (no millis, space separator). Mixing formats breaks conditional updates. Use `new Date().toISOString()` in parameterized queries.
+- **Raw SQL timestamp parameters: use `new Date().toISOString()` for SET, raw `Date` objects for WHERE.** Prisma's libsql adapter serializes `Date` objects to ISO strings matching `@updatedAt` format. But passing `.toISOString()` (a string) in a WHERE clause fails because the adapter returns `Date` objects from queries — string-vs-Date comparison never matches. For SET clauses, ISO strings work fine. Never use SQLite's `CURRENT_TIMESTAMP` (produces `2026-04-05 22:00:00` — no millis, space separator).
 - **`VOYAGE_API_KEY` must be set for semantic search.** Without it, embeddings fail silently and search falls back to FTS5. Add to `.env.local`.
 - **Chat messages are not notes.** Chat is stored in `Conversation`/`Message` tables, not in Note content. Don't confuse the two.
 - **Person summaries regenerate on link.** Fire-and-forget POST to `/api/ai/person-summary`. Receives current summary as input to preserve user edits.
@@ -139,7 +140,7 @@ Vitest with `fileParallelism: false` (SQLite concurrency). `tests/setup.ts` crea
 - **`NEXT_PUBLIC_BASE_URL` must match the deployment URL.** Used for fire-and-forget internal fetches (person summaries). If set to `localhost:3000` in production, those calls silently fail.
 - **Fire-and-forget fetches forward cookies.** `ai-tools.ts` and `organize/route.ts` forward the `Cookie` header in internal person-summary fetches so the proxy can authenticate them.
 - **Turso tokens stored in plaintext in admin DB.** Per-user DB auth tokens are not encrypted at rest. Acceptable for v1 (small trusted group), but encrypt them if the admin DB ever faces broader access.
-- **`jose` tests need `// @vitest-environment node` pragma.** The jsdom environment (default) causes jose to use its webapi entry point, which throws `TypeError: payload must be an instance of Uint8Array`. Add the pragma as the first line of any test file using `jose`.
+- **DB-touching tests need `// @vitest-environment node` pragma.** The default jsdom environment provides its own `Uint8Array`/`Buffer` which the libsql adapter rejects (`Expected a byte array, got object: [object ArrayBuffer]`). Add the pragma as the first line of any test file that imports from `@/lib/db` or uses Prisma. Also required for `jose` tests (same realm mismatch).
 - **`Secure` cookie flag must be conditional.** Use `process.env.NODE_ENV === "production" ? "; Secure" : ""` in Set-Cookie headers. `Secure` cookies are not sent over `http://localhost` in some browsers.
 - **Standalone scripts don't load `.env.local`.** Run with `set -a && source .env.local && set +a && npx tsx scripts/foo.ts`. Next.js auto-loads env files but `npx tsx` does not.
 - **Both slash command handlers must handle shared commands.** Commands without a `mode` field appear in both notes and chat, but `handleSlashCommand` (notes) and `handleChatSlashCommand` (chat) are separate functions in `page.tsx`. Add handlers to both.
