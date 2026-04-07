@@ -54,66 +54,57 @@ describe("Cascade Delete Completeness", () => {
     });
   });
 
-  describe("person note deletion (BUG CHECK)", () => {
-    it("does NOT clean up PersonMeta — confirming orphan bug", async () => {
+  describe("person note deletion (BUG-002 + BUG-003 fixed)", () => {
+    it("cleans up PersonMeta when person note is deleted", async () => {
       const person = await createPerson({ name: "Sarah Chen", role: "colleague" });
       const personNoteId = person.note.id;
 
-      // Create some links
       const note = await createNote({ content: "Met Sarah" });
       await addNotePerson(note.id, personNoteId);
 
-      // Simulate DELETE API cascade (current implementation)
+      // Simulate fixed DELETE API cascade
       await deleteCommandsForNote(personNoteId);
       await prisma.embedding.deleteMany({ where: { noteId: personNoteId } });
       await prisma.notePerson.deleteMany({ where: { noteId: personNoteId } });
-      // Also clean up reverse links (where this person is linked FROM other notes)
       await prisma.notePerson.deleteMany({ where: { personNoteId } });
+      await prisma.personMeta.deleteMany({ where: { noteId: personNoteId } });
       await prisma.pendingPerson.updateMany({
         where: { sourceNoteId: personNoteId },
         data: { sourceNoteId: null },
       });
       await deleteNote(personNoteId);
 
-      // BUG: PersonMeta is NOT deleted by the cascade
-      const orphanedMeta = await prisma.personMeta.findUnique({
+      const meta = await prisma.personMeta.findUnique({
         where: { noteId: personNoteId },
       });
-      expect(orphanedMeta).not.toBeNull(); // Confirms the bug — meta is orphaned
+      expect(meta).toBeNull();
     });
 
-    it("does NOT clean up reverse NotePerson links (BUG CHECK)", async () => {
+    it("cleans up reverse NotePerson links when person note is deleted", async () => {
       const person = await createPerson({ name: "Sarah" });
       const note = await createNote({ content: "Met Sarah" });
       await addNotePerson(note.id, person.note.id);
 
-      // Current DELETE cascade only does:
-      // notePerson.deleteMany({ where: { noteId: id } })
-      // This deletes links FROM the note, not links TO the note (as a person)
-      const linksBeforeDelete = await prisma.notePerson.findMany({
+      expect(await prisma.notePerson.findMany({
         where: { personNoteId: person.note.id },
-      });
-      expect(linksBeforeDelete).toHaveLength(1);
+      })).toHaveLength(1);
 
-      // Simulate DELETE cascade for the person note
+      // Simulate fixed DELETE API cascade
       await deleteCommandsForNote(person.note.id);
       await prisma.embedding.deleteMany({ where: { noteId: person.note.id } });
       await prisma.notePerson.deleteMany({ where: { noteId: person.note.id } });
+      await prisma.notePerson.deleteMany({ where: { personNoteId: person.note.id } });
+      await prisma.personMeta.deleteMany({ where: { noteId: person.note.id } });
       await prisma.pendingPerson.updateMany({
         where: { sourceNoteId: person.note.id },
         data: { sourceNoteId: null },
       });
       await deleteNote(person.note.id);
 
-      // Check: are reverse links cleaned up?
       const linksAfterDelete = await prisma.notePerson.findMany({
         where: { personNoteId: person.note.id },
       });
-      // If this is > 0, we have orphaned NotePerson rows
-      if (linksAfterDelete.length > 0) {
-        console.warn("BUG CONFIRMED: NotePerson reverse links orphaned after person note delete");
-      }
-      expect(linksAfterDelete).toHaveLength(1); // Documents the bug
+      expect(linksAfterDelete).toHaveLength(0);
     });
   });
 
