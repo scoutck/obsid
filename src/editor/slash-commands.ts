@@ -48,10 +48,15 @@ export function filterCommands(query: string, mode?: "notes" | "chat"): SlashCom
   }
   if (!query) return commands;
   const lower = query.toLowerCase();
-  return commands.filter(
-    (cmd) =>
-      cmd.label.toLowerCase().includes(lower) ||
-      cmd.description.toLowerCase().includes(lower) ||
-      cmd.category.toLowerCase().includes(lower)
+  const matches = commands.filter((cmd) =>
+    cmd.label.toLowerCase().startsWith(lower) ||
+    cmd.description.toLowerCase().includes(lower) ||
+    cmd.category.toLowerCase().includes(lower)
   );
+  matches.sort((a, b) => {
+    const aStarts = a.label.toLowerCase().startsWith(lower) ? 0 : 1;
+    const bStarts = b.label.toLowerCase().startsWith(lower) ? 0 : 1;
+    return aStarts - bStarts;
+  });
+  return matches;
 }

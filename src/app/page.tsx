@@ -347,6 +347,16 @@ export default function Home() {
         return;
       }
 
+      if (command.action === "ai:claude") {
+        const pos = view.state.selection.main.head;
+        view.dispatch({
+          changes: { from: pos, insert: "/claude " },
+          selection: { anchor: pos + 8 },
+        });
+        view.focus();
+        return;
+      }
+
       console.log("Unhandled command:", command.action);
     },
     [loadNote, noteId, organizeNote]
