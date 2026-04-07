@@ -157,3 +157,5 @@ export function parseChatMessage(raw: {
     toolCalls: safeParseJson(raw.toolCalls, []),
   };
 }
+
+export { type Task, parseTask } from "./task";
