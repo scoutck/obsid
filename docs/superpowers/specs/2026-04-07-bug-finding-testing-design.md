@@ -176,11 +176,35 @@ From initial exploration, these are likely bugs to confirm during the sweep:
 
 ---
 
+## Phase 4: Browser-Level Testing (Playwright)
+
+After phases 1-3, install Playwright and run E2E tests against the running dev server to catch client-side bugs that lib/API tests can't reach.
+
+### Setup
+- Install `@playwright/test` as dev dependency
+- Configure to run against `http://localhost:3000` (dev server must be running)
+- Test config at `playwright.config.ts`
+
+### Browser Tests
+- **Note editing flow** — create note, type content, verify auto-save, check tag extraction
+- **Slash command menu** — type `/`, verify menu appears, select command, verify execution
+- **Person flow** — `/newperson` stepped flow, verify modal interactions
+- **Chat mode** — switch via `/chatmode`, send message, verify response renders, switch back
+- **Wiki-link behavior** — type `[[`, verify link decoration, click to navigate
+- **Markdown preview** — verify markers hide on unfocused lines, show on active line
+- **Command widgets** — `/claude` instruction display, confirmation rendering
+
+**Test directory:** `tests/e2e/`
+
+---
+
 ## Execution Strategy
 
-- Each phase runs sequentially (1 -> 2 -> 3)
+- Phases run sequentially (1 -> 2 -> 3 -> 4)
 - Within each phase, independent test files can be written in parallel
 - Tests use the existing test infrastructure (`tests/setup.ts`, real SQLite DB)
 - AI-dependent tests (organize, chat, command routes) will be tested at the lib layer where possible, mocking only the Anthropic API calls
+- Phase 4 (Playwright) runs against the live dev server
 - Every bug found gets added to the bug report immediately
 - No code fixes until the report is complete and triaged
+- Bug report committed only after all 4 phases complete
