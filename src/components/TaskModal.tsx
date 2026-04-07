@@ -14,6 +14,7 @@ export default function TaskModal({ onNavigateToNote, onClose }: TaskModalProps)
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "overdue" | string>("all");
   const [people, setPeople] = useState<Array<{ noteId: string; name: string }>>([]);
+  const [noteNames, setNoteNames] = useState<Record<string, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchTasks = useCallback(async () => {
@@ -32,6 +33,20 @@ export default function TaskModal({ onNavigateToNote, onClose }: TaskModalProps)
     }
 
     setTasks(data);
+
+    // Fetch note titles for linked tasks
+    const noteIds = [...new Set(data.map((t) => t.noteId).filter(Boolean))] as string[];
+    if (noteIds.length > 0) {
+      const names: Record<string, string> = {};
+      const results = await Promise.all(
+        noteIds.map((id) => fetch(`/api/notes/${id}`).then((r) => r.ok ? r.json() : null))
+      );
+      results.forEach((note) => {
+        if (note) names[note.id] = note.title;
+      });
+      setNoteNames(names);
+    }
+
     setLoading(false);
   }, [search, filter]);
 
@@ -180,17 +195,24 @@ export default function TaskModal({ onNavigateToNote, onClose }: TaskModalProps)
                     >
                       {task.title}
                     </span>
-                    {task.noteId && (
-                      <button
-                        onClick={() => {
-                          onNavigateToNote(task.noteId!);
-                          onClose();
-                        }}
-                        className="block text-xs text-blue-400 hover:text-blue-600 truncate"
-                      >
-                        Open note
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {task.noteId && noteNames[task.noteId] && (
+                        <button
+                          onClick={() => {
+                            onNavigateToNote(task.noteId!);
+                            onClose();
+                          }}
+                          className="text-xs text-blue-400 hover:text-blue-600 truncate"
+                        >
+                          {noteNames[task.noteId]}
+                        </button>
+                      )}
+                      {task.personNoteId && (
+                        <span className="text-xs text-zinc-400">
+                          {people.find((p) => p.noteId === task.personNoteId)?.name}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   {formatDueDate(task.dueDate)}
                 </div>
