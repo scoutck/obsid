@@ -1642,7 +1642,9 @@ git commit -m "test: race condition tests — concurrent creates and updates (Ph
 
 ---
 
-## Phase 4: Browser-Level Testing (Playwright)
+## Phase 4: Browser-Level Testing + PM/UX Audit (Playwright)
+
+Adopt the mindset of a **senior PM and UX designer simultaneously**. Every page and flow gets evaluated for both functional correctness and experience quality. Screenshots at every step.
 
 ### Task 13: Install and Configure Playwright
 
@@ -1669,6 +1671,8 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3000",
     headless: true,
+    screenshot: "on",
+    trace: "on-first-retry",
   },
   webServer: {
     command: "npm run dev",
@@ -1676,6 +1680,7 @@ export default defineConfig({
     reuseExistingServer: true,
     timeout: 120000,
   },
+  outputDir: "tests/e2e/results",
 });
 ```
 
@@ -1683,122 +1688,97 @@ export default defineConfig({
 
 ```bash
 git add playwright.config.ts package.json package-lock.json
-git commit -m "chore: add Playwright for E2E testing (Phase 4)"
+git commit -m "chore: add Playwright for E2E testing + PM/UX audit (Phase 4)"
 ```
 
 ---
 
-### Task 14: Note Editing E2E Tests
+### Task 14: Note Editing Flow — Functional + PM/UX Audit
 
 **Files:**
 - Create: `tests/e2e/note-editing.spec.ts`
 
-- [ ] **Step 1: Write note editing E2E test**
+For each test step, screenshot the state and evaluate through PM/UX lens.
+
+- [ ] **Step 1: Write note editing E2E test with screenshots**
 
 ```typescript
 import { test, expect } from "@playwright/test";
 
-test.describe("Note Editing", () => {
-  test("page loads with editor", async ({ page }) => {
+test.describe("Note Editing Flow", () => {
+  test("initial page load — first impression audit", async ({ page }) => {
     await page.goto("/");
-    // The page should load without errors
-    // Look for the CodeMirror editor container
+    await page.screenshot({ path: "tests/e2e/results/01-initial-load.png", fullPage: true });
+
+    // FUNCTIONAL: editor loads
     const editor = page.locator(".cm-editor");
     await expect(editor).toBeVisible({ timeout: 10000 });
+
+    // PM: Is the happy path obvious within 3 seconds?
+    // PM: What job-to-be-done is this screen serving? (Write/edit notes)
+    // UX: Information hierarchy — is the editor the most prominent element?
+    // UX: Cognitive load — how many decisions is the user asked to make on first load?
+    // UX: Is there any onboarding cue or is the user dropped into a blank editor?
   });
 
-  test("can type in the editor", async ({ page }) => {
+  test("typing in editor — core interaction", async ({ page }) => {
     await page.goto("/");
     const editor = page.locator(".cm-editor .cm-content");
     await expect(editor).toBeVisible({ timeout: 10000 });
     await editor.click();
-    await page.keyboard.type("Hello from Playwright");
-    await expect(editor).toContainText("Hello from Playwright");
+    await page.keyboard.type("# Meeting Notes\n\nDiscussed the project timeline with Sarah.");
+    await page.screenshot({ path: "tests/e2e/results/02-typing-content.png", fullPage: true });
+
+    await expect(editor).toContainText("Meeting Notes");
+    await expect(editor).toContainText("Sarah");
+
+    // UX: Does the editor feel responsive? Any lag?
+    // UX: Is the font readable? Appropriate size and contrast?
+    // UX: Does markdown preview kick in (heading formatting)?
   });
 
-  test("slash menu appears on / keystroke", async ({ page }) => {
-    await page.goto("/");
-    const editor = page.locator(".cm-editor .cm-content");
-    await expect(editor).toBeVisible({ timeout: 10000 });
-    await editor.click();
-    await page.keyboard.type("/");
-    // Slash menu should appear
-    const slashMenu = page.locator("[class*='slash-menu'], [data-slash-menu]").first();
-    await expect(slashMenu).toBeVisible({ timeout: 5000 });
-  });
-
-  test("markdown heading renders in preview", async ({ page }) => {
+  test("markdown preview — unfocused line hides markers", async ({ page }) => {
     await page.goto("/");
     const editor = page.locator(".cm-editor .cm-content");
     await expect(editor).toBeVisible({ timeout: 10000 });
     await editor.click();
     await page.keyboard.type("# My Heading");
     await page.keyboard.press("Enter");
-    // Move cursor away from the heading line so preview kicks in
-    await page.keyboard.type("some body text");
-    // The heading should be visible (preview hides markers on unfocused lines)
-    await expect(editor).toContainText("My Heading");
+    await page.keyboard.type("Body text below the heading");
+    await page.screenshot({ path: "tests/e2e/results/03-markdown-preview.png", fullPage: true });
+
+    // FUNCTIONAL: heading line should hide # marker when cursor is on body line
+    // UX: Is the preview behavior obvious? Does the user understand what happened?
+    // UX: Is there visual differentiation between heading and body text?
   });
-});
-```
 
-- [ ] **Step 2: Run E2E tests**
-
-Run: `npx playwright test tests/e2e/note-editing.spec.ts`
-Record any failures — these may indicate client-side bugs.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add tests/e2e/note-editing.spec.ts
-git commit -m "test: note editing E2E tests with Playwright (Phase 4)"
-```
-
----
-
-### Task 15: Slash Command E2E Tests
-
-**Files:**
-- Create: `tests/e2e/slash-commands.spec.ts`
-
-- [ ] **Step 1: Write slash command E2E test**
-
-```typescript
-import { test, expect } from "@playwright/test";
-
-test.describe("Slash Commands", () => {
-  test("slash menu filters as user types", async ({ page }) => {
+  test("slash menu — discoverability and interaction", async ({ page }) => {
     await page.goto("/");
     const editor = page.locator(".cm-editor .cm-content");
     await expect(editor).toBeVisible({ timeout: 10000 });
     await editor.click();
-    await page.keyboard.type("/bo");
-    // Menu should be visible and filtered
+    await page.keyboard.type("/");
+    await page.screenshot({ path: "tests/e2e/results/04-slash-menu-open.png", fullPage: true });
+
     const slashMenu = page.locator("[class*='slash-menu'], [data-slash-menu]").first();
     await expect(slashMenu).toBeVisible({ timeout: 5000 });
-    // Should show "bold" related command
+
+    // PM: Is the slash menu discoverable? Would a new user know to type /?
+    // PM: Where would a user drop off here — too many options? Unclear labels?
+    // UX: Cognitive load — how many commands are shown? Is it overwhelming?
+    // UX: Affordances — do menu items look clickable? Is there hover state?
+    // UX: Is the menu positioned correctly relative to cursor?
+
+    // Filter the menu
+    await page.keyboard.type("bo");
+    await page.screenshot({ path: "tests/e2e/results/05-slash-menu-filtered.png", fullPage: true });
     await expect(slashMenu).toContainText(/bold/i);
+
+    // UX: Does filtering feel instant? Is the match highlighting clear?
+    // UX: What happens with no matches — is there a "no results" message?
   });
 
-  test("selecting a formatting command applies format", async ({ page }) => {
-    await page.goto("/");
-    const editor = page.locator(".cm-editor .cm-content");
-    await expect(editor).toBeVisible({ timeout: 10000 });
-    await editor.click();
-    // Type text, select it, then apply bold
-    await page.keyboard.type("make me bold");
-    await page.keyboard.press("Home");
-    await page.keyboard.press("Shift+End");
-    // Now type /bold via slash menu
-    await page.keyboard.press("End");
-    await page.keyboard.type("/bold");
-    // Wait for menu, then press Enter
-    const slashMenu = page.locator("[class*='slash-menu'], [data-slash-menu]").first();
-    await expect(slashMenu).toBeVisible({ timeout: 5000 });
-    await page.keyboard.press("Enter");
-  });
-
-  test("escape dismisses slash menu", async ({ page }) => {
+  test("slash menu — escape dismissal", async ({ page }) => {
     await page.goto("/");
     const editor = page.locator(".cm-editor .cm-content");
     await expect(editor).toBeVisible({ timeout: 10000 });
@@ -1807,74 +1787,304 @@ test.describe("Slash Commands", () => {
     const slashMenu = page.locator("[class*='slash-menu'], [data-slash-menu]").first();
     await expect(slashMenu).toBeVisible({ timeout: 5000 });
     await page.keyboard.press("Escape");
+    await page.screenshot({ path: "tests/e2e/results/06-slash-menu-dismissed.png", fullPage: true });
     await expect(slashMenu).not.toBeVisible({ timeout: 3000 });
+
+    // PM: Can the user recover from opening the menu accidentally?
+    // UX: Is the "/" character left behind after escape? Clean state?
+  });
+
+  test("slash menu — command execution (bold)", async ({ page }) => {
+    await page.goto("/");
+    const editor = page.locator(".cm-editor .cm-content");
+    await expect(editor).toBeVisible({ timeout: 10000 });
+    await editor.click();
+    await page.keyboard.type("make me bold");
+    // Select all text
+    await page.keyboard.press("Home");
+    await page.keyboard.press("Shift+End");
+    await page.screenshot({ path: "tests/e2e/results/07-text-selected.png", fullPage: true });
+
+    // Deselect and type slash command
+    await page.keyboard.press("End");
+    await page.keyboard.type("/bold");
+    const slashMenu = page.locator("[class*='slash-menu'], [data-slash-menu]").first();
+    await expect(slashMenu).toBeVisible({ timeout: 5000 });
+    await page.keyboard.press("Enter");
+    await page.screenshot({ path: "tests/e2e/results/08-bold-applied.png", fullPage: true });
+
+    // UX: Feedback loop — does the user see confirmation that bold was applied?
+    // UX: Does the formatting look correct in the editor?
+    // PM: Is the cost of a user error here low? Can they undo?
   });
 });
 ```
 
-- [ ] **Step 2: Run E2E tests**
+- [ ] **Step 2: Run tests and review screenshots**
 
-Run: `npx playwright test tests/e2e/slash-commands.spec.ts`
-Record any failures.
+Run: `npx playwright test tests/e2e/note-editing.spec.ts`
+Review each screenshot in `tests/e2e/results/` through the PM/UX lens. For each:
+1. Note the emotional state of a user at that moment
+2. Identify friction points
+3. Flag inconsistencies in patterns, language, or visual treatment
+4. Compare what the UI says it does vs what actually happens
+Add findings to the bug report.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add tests/e2e/slash-commands.spec.ts
-git commit -m "test: slash command E2E tests (Phase 4)"
+git add tests/e2e/note-editing.spec.ts
+git commit -m "test: note editing E2E + PM/UX audit screenshots (Phase 4)"
 ```
 
 ---
 
-### Task 16: Chat Mode E2E Tests
+### Task 15: Chat Mode Flow — Functional + PM/UX Audit
 
 **Files:**
 - Create: `tests/e2e/chat-mode.spec.ts`
 
-- [ ] **Step 1: Write chat mode E2E test**
+- [ ] **Step 1: Write chat mode E2E test with screenshots**
 
 ```typescript
 import { test, expect } from "@playwright/test";
 
-test.describe("Chat Mode", () => {
-  test("can switch to chat mode via slash command", async ({ page }) => {
+test.describe("Chat Mode Flow", () => {
+  test("switch to chat mode — mode transition audit", async ({ page }) => {
     await page.goto("/");
     const editor = page.locator(".cm-editor .cm-content");
     await expect(editor).toBeVisible({ timeout: 10000 });
     await editor.click();
 
-    // Type /chatmode and select it
+    await page.screenshot({ path: "tests/e2e/results/09-before-chatmode.png", fullPage: true });
+
+    // Type /chatmode
     await page.keyboard.type("/chatmode");
     const slashMenu = page.locator("[class*='slash-menu'], [data-slash-menu]").first();
-    // Menu may or may not appear — depends on timing
-    // Press Enter to execute
+    await expect(slashMenu).toBeVisible({ timeout: 5000 });
     await page.keyboard.press("Enter");
-
-    // Should switch to chat view
-    // Look for chat-specific UI elements
     await page.waitForTimeout(1000);
-    // Chat view should be visible or editor should be hidden
+
+    await page.screenshot({ path: "tests/e2e/results/10-chatmode-entered.png", fullPage: true });
+
+    // PM: Is the mode transition clear? Does the user know they're in chat?
+    // PM: Can they get back to notes easily? Is the exit path obvious?
+    // UX: Visual differentiation — does chat look distinct from note editing?
+    // UX: Is there a loading state during transition?
+    // UX: Feedback loop — did the UI confirm the mode switch?
+  });
+
+  test("switch back to note mode — return path audit", async ({ page }) => {
+    await page.goto("/");
+    const editor = page.locator(".cm-editor .cm-content");
+    await expect(editor).toBeVisible({ timeout: 10000 });
+    await editor.click();
+
+    // Enter chat mode
+    await page.keyboard.type("/chatmode");
+    const slashMenu = page.locator("[class*='slash-menu'], [data-slash-menu]").first();
+    await expect(slashMenu).toBeVisible({ timeout: 5000 });
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(1000);
+
+    await page.screenshot({ path: "tests/e2e/results/11-in-chatmode.png", fullPage: true });
+
+    // Try to switch back — look for a way to invoke /notemode
+    // The chat view should have its own input area
+    // PM: Is the return path discoverable without documentation?
+    // PM: What's the cost of a user accidentally entering chat mode?
   });
 });
 ```
 
-- [ ] **Step 2: Run E2E tests**
+- [ ] **Step 2: Run tests and review screenshots**
 
 Run: `npx playwright test tests/e2e/chat-mode.spec.ts`
-Record any failures.
+Review screenshots. Assess:
+- Mode transition clarity
+- Return path discoverability
+- Visual hierarchy in chat view
+- Whether CTAs align with the job-to-be-done
+Add findings to bug report.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add tests/e2e/chat-mode.spec.ts
-git commit -m "test: chat mode E2E tests (Phase 4)"
+git commit -m "test: chat mode E2E + PM/UX audit screenshots (Phase 4)"
+```
+
+---
+
+### Task 16: Tag and Wiki-Link Flow — Interaction Quality Audit
+
+**Files:**
+- Create: `tests/e2e/tags-and-links.spec.ts`
+
+- [ ] **Step 1: Write tag and wiki-link E2E test with screenshots**
+
+```typescript
+import { test, expect } from "@playwright/test";
+
+test.describe("Tags and Wiki-Links", () => {
+  test("tag autocomplete — # trigger audit", async ({ page }) => {
+    await page.goto("/");
+    const editor = page.locator(".cm-editor .cm-content");
+    await expect(editor).toBeVisible({ timeout: 10000 });
+    await editor.click();
+
+    await page.keyboard.type("Working on the ");
+    await page.keyboard.type("#");
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: "tests/e2e/results/12-tag-trigger.png", fullPage: true });
+
+    // UX: Does a tag autocomplete menu appear?
+    // UX: Is the # visually styled differently (tag syntax highlighting)?
+    // PM: Is the tag system discoverable?
+
+    await page.keyboard.type("project");
+    await page.screenshot({ path: "tests/e2e/results/13-tag-typed.png", fullPage: true });
+
+    // UX: Is the tag visually distinct from regular text?
+    // UX: Does the autocomplete help or get in the way?
+  });
+
+  test("wiki-link — [[ trigger audit", async ({ page }) => {
+    await page.goto("/");
+    const editor = page.locator(".cm-editor .cm-content");
+    await expect(editor).toBeVisible({ timeout: 10000 });
+    await editor.click();
+
+    await page.keyboard.type("See also [[");
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: "tests/e2e/results/14-wikilink-trigger.png", fullPage: true });
+
+    await page.keyboard.type("Meeting Notes]]");
+    await page.screenshot({ path: "tests/e2e/results/15-wikilink-complete.png", fullPage: true });
+
+    // UX: Is the wiki-link visually decorated (different from plain text)?
+    // UX: Does it look clickable? Does the affordance match the action?
+    // PM: What happens if the linked note doesn't exist? Error? Create prompt?
+  });
+
+  test("empty editor — zero state audit", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForTimeout(2000);
+    await page.screenshot({ path: "tests/e2e/results/16-zero-state.png", fullPage: true });
+
+    // PM: What does a brand new user see? Is there guidance?
+    // PM: Is the happy path obvious within 3 seconds? (Start typing)
+    // UX: Is there placeholder text or an empty state message?
+    // UX: Cognitive load — how many things compete for attention?
+    // UX: Accessibility — is there any screen reader guidance?
+  });
+});
+```
+
+- [ ] **Step 2: Run tests and review screenshots**
+
+Run: `npx playwright test tests/e2e/tags-and-links.spec.ts`
+Review screenshots for interaction quality. Assess:
+- Tag and link discoverability
+- Visual consistency of inline syntax
+- Zero state experience for new users
+- Accessibility (contrast, font sizes, focus indicators)
+Add findings to bug report.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add tests/e2e/tags-and-links.spec.ts
+git commit -m "test: tags, wiki-links, and zero state E2E + PM/UX audit (Phase 4)"
+```
+
+---
+
+### Task 17: Full Flow Walkthrough — Senior PM/UX Evaluation
+
+This is a manual evaluation task (no automated test file). Navigate the app as a real user would and document everything.
+
+- [ ] **Step 1: Start the dev server**
+
+```bash
+npm run dev
+```
+
+- [ ] **Step 2: Walk through core flows with Playwright scripting**
+
+Create a walkthrough script that captures the full user journey:
+
+```typescript
+// tests/e2e/full-walkthrough.spec.ts
+import { test, expect } from "@playwright/test";
+
+test.describe("Full User Journey — PM/UX Walkthrough", () => {
+  test("complete note-taking session", async ({ page }) => {
+    // Step 1: Land on app
+    await page.goto("/");
+    await page.screenshot({ path: "tests/e2e/results/walk-01-landing.png", fullPage: true });
+
+    const editor = page.locator(".cm-editor .cm-content");
+    await expect(editor).toBeVisible({ timeout: 10000 });
+
+    // Step 2: Create first note with content
+    await editor.click();
+    await page.keyboard.type("# Project Kickoff\n\nMet with Sarah and Bob to discuss the new feature. Key decisions:\n\n- Launch date is April 15\n- Bob will handle backend\n- Sarah owns the design\n\n#meeting #project");
+    await page.screenshot({ path: "tests/e2e/results/walk-02-note-written.png", fullPage: true });
+
+    // Step 3: Try to create a new note via slash command
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("/new");
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: "tests/e2e/results/walk-03-new-note-cmd.png", fullPage: true });
+
+    // Step 4: Try the /notes command to see note list
+    // First dismiss any open menu
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+    // Clear the /new text
+    await page.keyboard.press("Backspace");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type("/notes");
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: "tests/e2e/results/walk-04-notes-list-cmd.png", fullPage: true });
+
+    // PM EVALUATION at each step:
+    // - User emotional state: confident? confused? anxious?
+    // - Friction points: anything that made them pause, guess, or backtrack?
+    // - Pattern consistency: do similar actions work the same way?
+    // - Error recovery: what happens if they make a mistake?
+  });
+});
+```
+
+- [ ] **Step 3: Review all screenshots and compile PM/UX findings**
+
+For each screenshot, document:
+1. **User emotional state** at that moment (confused? confident? anxious?)
+2. **Friction points** — anything that makes the user pause, guess, or backtrack
+3. **Inconsistencies** in patterns, language, or visual treatment
+4. **UI vs reality** — what the UI says it does vs what actually happens
+5. **PM assessment** — job-to-be-done clarity, happy path visibility, drop-off risk, error recovery cost, CTA alignment
+6. **UX assessment** — information hierarchy, cognitive load, affordances, feedback loops, accessibility (contrast, font sizes, tab order)
+
+Add all findings to the bug report under a new "UI/UX Issues" section with severities.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add tests/e2e/full-walkthrough.spec.ts
+git commit -m "test: full user journey walkthrough + PM/UX evaluation (Phase 4)"
 ```
 
 ---
 
 ## Phase 5: Bug Report Compilation
 
-### Task 17: Compile Bug Report
+### Task 18: Compile Bug Report
 
 **Files:**
 - Create: `docs/superpowers/specs/2026-04-07-bug-report.md`
@@ -1909,7 +2119,7 @@ Write the report to `docs/superpowers/specs/2026-04-07-bug-report.md` with this 
 
 ### BUG-001: [Title]
 - **Location:** `file:line`
-- **Category:** [data integrity | error handling | race condition | cascade | UI]
+- **Category:** [data integrity | error handling | race condition | cascade | UI/UX]
 - **Description:** ...
 - **Reproduction:** ...
 - **Impact:** ...
@@ -1922,6 +2132,22 @@ Write the report to `docs/superpowers/specs/2026-04-07-bug-report.md` with this 
 
 ## Low
 ...
+
+---
+
+## UI/UX Issues (PM/UX Audit)
+
+For each issue, include the screenshot reference and dual assessment.
+
+### UX-001: [Title]
+- **Flow:** [which user flow]
+- **Screenshot:** `tests/e2e/results/<filename>.png`
+- **Severity:** [critical | high | medium | low]
+- **PM Assessment:** [job-to-be-done, happy path, drop-off risk, error recovery]
+- **UX Assessment:** [hierarchy, cognitive load, affordances, feedback, accessibility]
+- **User Emotional State:** [confused | confident | anxious | frustrated]
+- **Friction:** [what makes the user pause, guess, or backtrack]
+- **Recommendation:** [what to change]
 ```
 
 - [ ] **Step 3: Commit bug report**
