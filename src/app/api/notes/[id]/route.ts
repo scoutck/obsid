@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getNote, updateNote, deleteNote } from "@/lib/notes";
 import { deleteCommandsForNote } from "@/lib/commands";
-import { embedNote } from "@/lib/embeddings";
 
 export async function GET(
   request: NextRequest,
@@ -25,12 +24,6 @@ export async function PUT(
   const { id } = await params;
   const body = await request.json();
   const note = await updateNote(id, body, db);
-
-  // Fire-and-forget embedding
-  embedNote(note.id, note.title, note.content, db).catch((err) =>
-    console.error("[embed] Background embed failed:", err)
-  );
-
   return NextResponse.json(note);
 }
 
