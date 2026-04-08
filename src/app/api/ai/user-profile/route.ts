@@ -53,6 +53,9 @@ Rules:
     if (block.type === "text") resultText += block.text;
   }
 
+  // Strip markdown code fences if present
+  resultText = resultText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+
   try {
     const profile = JSON.parse(resultText);
     return Response.json(profile);

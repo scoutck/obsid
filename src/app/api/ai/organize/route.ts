@@ -116,6 +116,9 @@ Return JSON in this exact format:
     if (block.type === "text") resultText += block.text;
   }
 
+  // Strip markdown code fences if present (AI sometimes wraps JSON in ```json ... ```)
+  resultText = resultText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+
   let result: OrganizeResult;
   try {
     result = JSON.parse(resultText);
