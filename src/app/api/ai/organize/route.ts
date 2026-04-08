@@ -156,6 +156,28 @@ Return JSON in this exact format:
     }
   }
 
+  // Compute final tags from updated content
+  const finalTags = extractInlineTags(updatedContent);
+
+  // Atomic conditional update: only writes if updatedAt hasn't changed.
+  // All side effects (people links, pending people, insights) are deferred
+  // until after the update succeeds to avoid orphaned data on stale writes.
+  const updated = await conditionalUpdateNote(
+    noteId,
+    new Date(snapshotUpdatedAt),
+    {
+      content: updatedContent,
+      tags: finalTags,
+    },
+    db
+  );
+
+  if (!updated) {
+    return Response.json({ stale: true });
+  }
+
+  // --- Side effects: only run after successful content update ---
+
   // Batch create all note-person links
   await addNotePeople(noteId, resolvedPersonNoteIds, db);
 
@@ -179,24 +201,6 @@ Return JSON in this exact format:
       db
     );
     insightsAdded = created.length;
-  }
-
-  // Compute final tags from updated content
-  const finalTags = extractInlineTags(updatedContent);
-
-  // Atomic conditional update: only writes if updatedAt hasn't changed
-  const updated = await conditionalUpdateNote(
-    noteId,
-    new Date(snapshotUpdatedAt),
-    {
-      content: updatedContent,
-      tags: finalTags,
-    },
-    db
-  );
-
-  if (!updated) {
-    return Response.json({ stale: true });
   }
 
   // Fire-and-forget embedding trigger

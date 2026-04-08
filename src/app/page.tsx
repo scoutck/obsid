@@ -145,8 +145,10 @@ export default function Home() {
         fetch(`/api/notes/${id}`),
         fetch(`/api/notes/${id}/commands`),
       ]);
+      if (!noteRes.ok) return;
       const note = await noteRes.json();
-      const cmds: CommandData[] = await cmdsRes.json();
+      if (!note.id || note.error) return;
+      const cmds: CommandData[] = cmdsRes.ok ? await cmdsRes.json() : [];
       setNoteId(note.id);
       setContent(note.content);
       setNoteTags(note.tags || []);
@@ -281,6 +283,12 @@ export default function Home() {
 
       if (command.action === "ai:organize") {
         if (!noteId) return;
+        // Cancel pending auto-save so it doesn't bump updatedAt while
+        // the organize endpoint is processing (causes stale detection).
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+          saveTimeoutRef.current = null;
+        }
         setToast("Organizing...");
         organizeNote(noteId).then((result) => {
           if (!result) {
@@ -421,6 +429,10 @@ export default function Home() {
     (newContent: string) => {
       contentRef.current = newContent;
       if (!noteId) return;
+
+      // Never overwrite a note with empty content — guard against edge-case
+      // races (e.g. editor remount with stale state) that could blank a note.
+      if (!newContent.trim()) return;
 
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(async () => {
