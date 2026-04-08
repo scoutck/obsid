@@ -63,6 +63,7 @@ export default function UserProfilePage({ onSelectNote, onBack }: UserProfilePag
     }
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchData(); }, [fetchData]);
 
   if (loading) {

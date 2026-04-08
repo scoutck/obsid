@@ -62,6 +62,8 @@ describe("createUserInsights", () => {
 describe("getUserInsights", () => {
   it("returns all insights ordered by createdAt desc", async () => {
     await createUserInsight({ category: "behavior", content: "First" });
+    // Small delay to ensure different timestamps
+    await new Promise((r) => setTimeout(r, 10));
     await createUserInsight({ category: "expertise", content: "Second" });
 
     const insights = await getUserInsights();
