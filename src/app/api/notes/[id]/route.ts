@@ -57,6 +57,7 @@ export async function DELETE(
     where: { personNoteId: id },
     data: { personNoteId: null },
   });
+  await db.userInsight.deleteMany({ where: { sourceNoteId: id } });
   await deleteNote(id, db);
   return NextResponse.json({ success: true });
 }

@@ -48,6 +48,10 @@ export default function UserProfilePage({ onSelectNote, onBack }: UserProfilePag
   const fetchData = useCallback(async () => {
     setLoading(true);
     const res = await fetch("/api/user-insights");
+    if (!res.ok) {
+      setLoading(false);
+      return;
+    }
     const data: RawInsight[] = await res.json();
     setInsights(data);
     setLoading(false);

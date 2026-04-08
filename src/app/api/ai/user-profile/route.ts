@@ -7,7 +7,8 @@ const anthropic = new Anthropic();
 
 export async function POST(request: NextRequest) {
   const db = getDb(request);
-  const insights = await getUserInsights(db);
+  const allInsights = await getUserInsights(db);
+  const insights = allInsights.slice(0, 200);
 
   if (insights.length === 0) {
     return Response.json({
