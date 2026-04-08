@@ -19,6 +19,8 @@ const PersonPage = dynamic(() => import("@/components/PersonPage"), {
 });
 const NewPersonFlow = dynamic(() => import("@/components/NewPersonFlow"));
 const PendingPeopleModal = dynamic(() => import("@/components/PendingPeopleModal"));
+const TaskInput = dynamic(() => import("@/components/TaskInput"));
+const TaskModal = dynamic(() => import("@/components/TaskModal"));
 import { executeFormatting } from "@/editor/formatting";
 import { extractWikiLinks } from "@/editor/wiki-links";
 import { extractInlineTags } from "@/lib/extract-tags";
@@ -45,6 +47,8 @@ export default function Home() {
   const [showNewPerson, setShowNewPerson] = useState(false);
   const [newPersonPrefill, setNewPersonPrefill] = useState<string | undefined>();
   const [showPendingPeople, setShowPendingPeople] = useState(false);
+  const [showTaskInput, setShowTaskInput] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
   const [personPageId, setPersonPageId] = useState<string | null>(null);
   const [aiResponse, setAiResponse] = useState<{
     prompt: string;
@@ -357,6 +361,16 @@ export default function Home() {
         return;
       }
 
+      if (command.action === "task:create") {
+        setShowTaskInput(true);
+        return;
+      }
+
+      if (command.action === "task:list") {
+        setShowTaskModal(true);
+        return;
+      }
+
       console.log("Unhandled command:", command.action);
     },
     [loadNote, noteId, organizeNote]
@@ -375,6 +389,22 @@ export default function Home() {
       });
     },
     [noteId, noteTags]
+  );
+
+  const handleCreateTask = useCallback(
+    (title: string) => {
+      setShowTaskInput(false);
+      fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, noteId: noteId ?? undefined }),
+      })
+        .then((res) => {
+          setToast(res.ok ? "Task created" : "Failed to create task");
+        })
+        .catch(() => setToast("Failed to create task"));
+    },
+    [noteId]
   );
 
   // Auto-save with debounce
@@ -552,6 +582,10 @@ export default function Home() {
         fetch("/api/auth/logout", { method: "POST" }).then(() => {
           window.location.href = "/login";
         });
+      } else if (action === "task" || action === "task:create") {
+        setShowTaskInput(true);
+      } else if (action === "tasks" || action === "task:list") {
+        setShowTaskModal(true);
       }
     },
     []
@@ -678,6 +712,21 @@ export default function Home() {
             setShowNewPerson(true);
           }}
           onClose={() => setShowPendingPeople(false)}
+        />
+      )}
+      {showTaskInput && (
+        <TaskInput
+          onSubmit={handleCreateTask}
+          onClose={() => setShowTaskInput(false)}
+        />
+      )}
+      {showTaskModal && (
+        <TaskModal
+          onNavigateToNote={(id) => {
+            setShowTaskModal(false);
+            loadNote(id);
+          }}
+          onClose={() => setShowTaskModal(false)}
         />
       )}
     </main>
