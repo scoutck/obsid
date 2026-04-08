@@ -21,6 +21,9 @@ const NewPersonFlow = dynamic(() => import("@/components/NewPersonFlow"));
 const PendingPeopleModal = dynamic(() => import("@/components/PendingPeopleModal"));
 const TaskInput = dynamic(() => import("@/components/TaskInput"));
 const TaskModal = dynamic(() => import("@/components/TaskModal"));
+const UserProfilePage = dynamic(() => import("@/components/UserProfilePage"), {
+  loading: () => <div className="flex items-center justify-center h-full"><p className="text-zinc-500">Loading...</p></div>,
+});
 import { executeFormatting } from "@/editor/formatting";
 import { extractWikiLinks } from "@/editor/wiki-links";
 import { extractInlineTags } from "@/lib/extract-tags";
@@ -49,6 +52,7 @@ export default function Home() {
   const [showPendingPeople, setShowPendingPeople] = useState(false);
   const [showTaskInput, setShowTaskInput] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [personPageId, setPersonPageId] = useState<string | null>(null);
   const [aiResponse, setAiResponse] = useState<{
     prompt: string;
@@ -371,6 +375,11 @@ export default function Home() {
         return;
       }
 
+      if (command.action === "profile:me") {
+        setShowProfile(true);
+        return;
+      }
+
       console.log("Unhandled command:", command.action);
     },
     [loadNote, noteId, organizeNote]
@@ -586,6 +595,8 @@ export default function Home() {
         setShowTaskInput(true);
       } else if (action === "tasks" || action === "task:list") {
         setShowTaskModal(true);
+      } else if (action === "me" || action === "profile:me") {
+        setShowProfile(true);
       }
     },
     []
@@ -609,7 +620,15 @@ export default function Home() {
       )}
 
       <div className="flex-1 overflow-hidden">
-        {personPageId ? (
+        {showProfile ? (
+          <UserProfilePage
+            onSelectNote={(id) => {
+              setShowProfile(false);
+              loadNote(id);
+            }}
+            onBack={() => setShowProfile(false)}
+          />
+        ) : personPageId ? (
           <PersonPage
             personNoteId={personPageId}
             onSelectNote={(id) => {
