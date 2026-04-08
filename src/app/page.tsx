@@ -77,6 +77,7 @@ export default function Home() {
         const latest = existingNotes[0];
         setNoteId(latest.id);
         setContent(latest.content);
+        contentRef.current = latest.content;
         setNoteTags(latest.tags || []);
         return;
       }
@@ -94,6 +95,7 @@ export default function Home() {
       const note = await res.json();
       setNoteId(note.id);
       setContent(note.content);
+      contentRef.current = note.content;
     }
     init();
   }, []);
@@ -151,6 +153,7 @@ export default function Home() {
       const cmds: CommandData[] = cmdsRes.ok ? await cmdsRes.json() : [];
       setNoteId(note.id);
       setContent(note.content);
+      contentRef.current = note.content;
       setNoteTags(note.tags || []);
       setNoteCommands(cmds);
 
@@ -181,6 +184,7 @@ export default function Home() {
         const newNote = await createRes.json();
         setNoteId(newNote.id);
         setContent(newNote.content);
+        contentRef.current = newNote.content;
       }
     },
     [loadNote]
@@ -210,6 +214,7 @@ export default function Home() {
           .then((note) => {
             setNoteId(note.id);
             setContent("");
+            contentRef.current = "";
           });
         return;
       }
@@ -242,6 +247,7 @@ export default function Home() {
               .then((note) => {
                 setNoteId(note.id);
                 setContent(note.content);
+                contentRef.current = note.content;
               });
           });
         return;
@@ -595,6 +601,7 @@ export default function Home() {
           .then((note) => {
             setNoteId(note.id);
             setContent("");
+            contentRef.current = "";
             setMode("notes");
           });
       } else if (action === "opennote" || action === "note:open") {
@@ -657,7 +664,7 @@ export default function Home() {
         ) : (
           <Editor
             key={noteId ?? "empty"}
-            initialContent={content}
+            initialContent={contentRef.current}
             initialCommands={noteCommands}
             mode={mode}
             onChange={handleChange}
