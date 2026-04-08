@@ -69,6 +69,28 @@ describe("POST /api/tasks", () => {
     expect(data.title).toBe("New task");
     expect(data.completed).toBe(false);
   });
+
+  it("rejects empty title", async () => {
+    const { POST } = await import("@/app/api/tasks/route");
+    const request = new Request("http://localhost/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "" }),
+    });
+    const response = await POST(request as unknown as NextRequest);
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects missing title", async () => {
+    const { POST } = await import("@/app/api/tasks/route");
+    const request = new Request("http://localhost/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const response = await POST(request as unknown as NextRequest);
+    expect(response.status).toBe(400);
+  });
 });
 
 describe("PATCH /api/tasks/[id]", () => {
@@ -87,6 +109,19 @@ describe("PATCH /api/tasks/[id]", () => {
     const data = await response.json();
 
     expect(data.completed).toBe(true);
+  });
+
+  it("returns 404 for non-existent task", async () => {
+    const { PATCH } = await import("@/app/api/tasks/[id]/route");
+    const request = new Request("http://localhost/api/tasks/nonexistent", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ completed: true }),
+    });
+    const response = await PATCH(request as unknown as NextRequest, {
+      params: Promise.resolve({ id: "nonexistent" }),
+    });
+    expect(response.status).toBe(404);
   });
 });
 
@@ -107,5 +142,16 @@ describe("DELETE /api/tasks/[id]", () => {
 
     const remaining = await getTasks();
     expect(remaining).toHaveLength(0);
+  });
+
+  it("returns 404 for non-existent task", async () => {
+    const { DELETE } = await import("@/app/api/tasks/[id]/route");
+    const request = new Request("http://localhost/api/tasks/nonexistent", {
+      method: "DELETE",
+    });
+    const response = await DELETE(request as unknown as NextRequest, {
+      params: Promise.resolve({ id: "nonexistent" }),
+    });
+    expect(response.status).toBe(404);
   });
 });

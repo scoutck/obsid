@@ -398,7 +398,11 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, noteId: noteId ?? undefined }),
-      }).then(() => setToast("Task created"));
+      })
+        .then((res) => {
+          setToast(res.ok ? "Task created" : "Failed to create task");
+        })
+        .catch(() => setToast("Failed to create task"));
     },
     [noteId]
   );

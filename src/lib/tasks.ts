@@ -138,6 +138,7 @@ export async function searchTasks(
   return raw.map((r) =>
     parseTask({
       ...r,
+      completed: !!r.completed,
       createdAt: new Date(r.createdAt),
       updatedAt: new Date(r.updatedAt),
     })
