@@ -33,6 +33,8 @@ export const slashCommands: SlashCommand[] = [
   // Tasks
   { label: "New Task", category: "Organization", description: "Create a task", action: "task:create" },
   { label: "Tasks", category: "Organization", description: "View all tasks", action: "task:list" },
+  // Profile
+  { label: "Me", category: "Organization", description: "View your profile", action: "profile:me" },
   // AI (notes-only)
   { label: "Ask Claude", category: "AI", description: "Ask AI about your notes", action: "ai:ask", mode: "notes" },
   { label: "Organize", category: "AI", description: "AI-tag and link this note", action: "ai:organize", mode: "notes" },

@@ -5,6 +5,7 @@ import { createNote, deleteNote } from "@/lib/notes";
 import { createPerson, addNotePerson } from "@/lib/people";
 import { createCommand, deleteCommandsForNote } from "@/lib/commands";
 import { createConversation, addMessage } from "@/lib/conversations";
+import { createUserInsight } from "@/lib/user-insights";
 
 beforeEach(async () => {
   await prisma.message.deleteMany();
@@ -13,6 +14,7 @@ beforeEach(async () => {
   await prisma.personMeta.deleteMany();
   await prisma.command.deleteMany();
   await prisma.embedding.deleteMany();
+  await prisma.userInsight.deleteMany();
   await prisma.pendingPerson.deleteMany();
   await prisma.note.deleteMany();
 });
@@ -36,6 +38,12 @@ describe("Cascade Delete Completeness", () => {
       await prisma.pendingPerson.create({
         data: { name: "Bob", sourceNoteId: note.id, context: "test", status: "pending" },
       });
+      await createUserInsight({
+        category: "expertise",
+        content: "Knows TypeScript",
+        evidence: "test evidence",
+        sourceNoteId: note.id,
+      });
 
       // Simulate DELETE API cascade
       await deleteCommandsForNote(note.id);
@@ -45,12 +53,14 @@ describe("Cascade Delete Completeness", () => {
         where: { sourceNoteId: note.id },
         data: { sourceNoteId: null },
       });
+      await prisma.userInsight.deleteMany({ where: { sourceNoteId: note.id } });
       await deleteNote(note.id);
 
       // Verify all cleaned up
       expect(await prisma.command.findMany({ where: { noteId: note.id } })).toHaveLength(0);
       expect(await prisma.embedding.findMany({ where: { noteId: note.id } })).toHaveLength(0);
       expect(await prisma.notePerson.findMany({ where: { noteId: note.id } })).toHaveLength(0);
+      expect(await prisma.userInsight.findMany({ where: { sourceNoteId: note.id } })).toHaveLength(0);
     });
   });
 

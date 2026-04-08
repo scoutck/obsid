@@ -9,6 +9,7 @@ import {
   addNotePeople,
 } from "@/lib/people";
 import { createPendingPerson } from "@/lib/pending-people";
+import { createUserInsights } from "@/lib/user-insights";
 import { embedNote } from "@/lib/embeddings";
 import { extractWikiLinks } from "@/editor/wiki-links";
 
@@ -18,6 +19,7 @@ interface OrganizeResult {
   links: string[];
   people: Array<{ name: string; role?: string }>;
   unresolvedPeople: string[];
+  userInsights?: Array<{ category: string; content: string; evidence?: string }>;
 }
 
 export async function POST(request: NextRequest) {
@@ -79,7 +81,8 @@ ${peopleList || "(none yet)"}
 - Only suggest links to notes that actually exist in the vault (match by title).
 - For people: match names in the note against known aliases (case-insensitive). In the "people" array, use the person's primary name exactly as listed in "Known people" above (the name before the parentheses), NOT the name variant found in the note text.
 - If a name is ambiguous or doesn't match any known person, put it in unresolvedPeople.
-- Return valid JSON only, no markdown wrapping.`;
+- Return valid JSON only, no markdown wrapping.
+- Also scan for self-reflective statements — moments where the author reveals something about themselves: habits, struggles, preferences, expertise, how they think or work. NOT task items ("finish the report") but self-revealing statements ("I always leave reports to the last minute"). Return these as userInsights with category being one of: "self-reflection", "expertise", "behavior", "thinking-pattern".`;
 
   const userPrompt = `Analyze this note and return JSON with links, people, and unresolved people.
 
@@ -91,7 +94,8 @@ Return JSON in this exact format:
 {
   "links": ["Existing Note Title"],
   "people": [{"name": "Full Name", "role": "optional role"}],
-  "unresolvedPeople": ["new or ambiguous name"]
+  "unresolvedPeople": ["new or ambiguous name"],
+  "userInsights": [{"category": "behavior", "content": "insight text", "evidence": "quote from note"}]
 }`;
 
   let response;
@@ -111,6 +115,9 @@ Return JSON in this exact format:
   for (const block of response.content) {
     if (block.type === "text") resultText += block.text;
   }
+
+  // Strip markdown code fences if present (AI sometimes wraps JSON in ```json ... ```)
+  resultText = resultText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
 
   let result: OrganizeResult;
   try {
@@ -159,6 +166,21 @@ Return JSON in this exact format:
     pendingPeople.push(name);
   }
 
+  // Store user insights from AI analysis
+  let insightsAdded = 0;
+  if (result.userInsights && result.userInsights.length > 0) {
+    const created = await createUserInsights(
+      result.userInsights.map((i) => ({
+        category: i.category,
+        content: i.content,
+        evidence: i.evidence ?? "",
+        sourceNoteId: noteId,
+      })),
+      db
+    );
+    insightsAdded = created.length;
+  }
+
   // Compute final tags from updated content
   const finalTags = extractInlineTags(updatedContent);
 
@@ -198,5 +220,6 @@ Return JSON in this exact format:
     linksAdded: result.links.filter((l) => !existingLinks.includes(l)),
     peopleResolved: resolvedPeople,
     pendingPeople,
+    insightsAdded,
   });
 }

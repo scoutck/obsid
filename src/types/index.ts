@@ -158,4 +158,27 @@ export function parseChatMessage(raw: {
   };
 }
 
+export interface UserInsight {
+  id: string;
+  category: "self-reflection" | "expertise" | "behavior" | "thinking-pattern";
+  content: string;
+  evidence: string;
+  sourceNoteId: string | null;
+  createdAt: Date;
+}
+
+export function parseUserInsight(raw: {
+  id: string;
+  category: string;
+  content: string;
+  evidence: string;
+  sourceNoteId: string | null;
+  createdAt: Date;
+}): UserInsight {
+  return {
+    ...raw,
+    category: raw.category as UserInsight["category"],
+  };
+}
+
 export { type Task, parseTask } from "./task";

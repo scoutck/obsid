@@ -106,3 +106,15 @@ model Task {
   @@index([personNoteId])
   @@index([completed])
 }
+
+model UserInsight {
+  id           String   @id @default(uuid())
+  category     String
+  content      String
+  evidence     String   @default("")
+  sourceNoteId String?
+  createdAt    DateTime @default(now())
+
+  @@index([category])
+  @@index([sourceNoteId])
+}
