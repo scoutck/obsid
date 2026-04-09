@@ -263,8 +263,10 @@ export async function executeTool(
     case "get_note_graph": {
       const depth = Math.min((input.depth as number) ?? 2, 3);
       const graph = await getNoteGraph(input.noteId as string, depth, db);
-      if (graph.length === 0) return "No linked notes found.";
-      return graph.map((entry) =>
+      // Filter out the root note (depth 0) — the AI already has it in context
+      const linked = graph.filter((entry) => entry.depth > 0);
+      if (linked.length === 0) return "No linked notes found.";
+      return linked.map((entry) =>
         `- **${entry.note.title || "Untitled"}** (id: ${entry.note.id}, ${entry.depth} hop${entry.depth > 1 ? "s" : ""} away)\n  Preview: ${entry.note.content.slice(0, 150)}...`
       ).join("\n\n");
     }

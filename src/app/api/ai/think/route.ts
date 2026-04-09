@@ -18,6 +18,7 @@ interface ThinkResult {
 
 export async function POST(request: NextRequest) {
   const db = getDb(request);
+  const cookie = request.headers.get("cookie") ?? "";
   const { noteId } = await request.json();
 
   const note = await getNote(noteId, db);
@@ -107,7 +108,7 @@ If you find no meaningful connections, return: {"connections": "", "insights": [
           const result = await executeTool(
             block.name,
             block.input as Record<string, unknown>,
-            { sourceNoteId: noteId, embeddingCache },
+            { sourceNoteId: noteId, embeddingCache, cookie },
             db
           );
           return {

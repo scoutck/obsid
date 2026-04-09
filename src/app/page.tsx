@@ -381,17 +381,30 @@ export default function Home() {
 
       if (command.action === "ai:think") {
         if (!noteId) return;
-        // Cancel pending auto-save to avoid stale detection
+        // Cancel pending auto-save and flush current content so /think
+        // reasons about the latest version, not a stale DB snapshot.
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
           saveTimeoutRef.current = null;
         }
+        const currentContent = contentRef.current;
+        const titleMatch = currentContent.match(/^#\s+(.+)$/m);
+        const title = titleMatch
+          ? titleMatch[1]
+          : currentContent.split("\n")[0]?.slice(0, 100) || "";
+        const links = extractWikiLinks(currentContent);
+        const tags = extractInlineTags(currentContent);
         setToast("Thinking deeply...");
-        fetch("/api/ai/think", {
-          method: "POST",
+        fetch(`/api/notes/${noteId}`, {
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ noteId }),
+          body: JSON.stringify({ title, content: currentContent, links, tags }),
         })
+          .then(() => fetch("/api/ai/think", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ noteId }),
+          }))
           .then(async (res) => {
             if (!res.ok) {
               setToast("Think failed");
