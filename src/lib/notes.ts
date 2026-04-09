@@ -20,6 +20,7 @@ interface CreateNoteInput {
 interface UpdateNoteInput {
   title?: string;
   content?: string;
+  summary?: string;
   tags?: string[];
   type?: string;
   links?: string[];
@@ -83,6 +84,10 @@ export async function conditionalUpdateNote(
   if (input.content !== undefined) {
     sets.push(`content = ?`);
     params.push(input.content);
+  }
+  if (input.summary !== undefined) {
+    sets.push(`summary = ?`);
+    params.push(input.summary);
   }
   if (input.tags !== undefined) {
     sets.push(`tags = ?`);
