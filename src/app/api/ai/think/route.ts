@@ -228,13 +228,19 @@ If you find no meaningful connections, return: {"connections": "", "insights": [
   // Append connections to note content
   let connectionsAdded = false;
   if (result.connections && result.connections.trim()) {
+    // Re-fetch note to get current content and updatedAt — the client may have
+    // saved content before calling /think, bumping updatedAt since our initial fetch.
+    const freshNote = await getNote(noteId, db);
+    if (!freshNote) {
+      return Response.json({ error: "Note not found" }, { status: 404 });
+    }
     const connectionsSection = `\n\n---\n**Connections**\n${result.connections.trim()}\n`;
-    const updatedContent = note.content.trimEnd() + connectionsSection;
+    const updatedContent = freshNote.content.trimEnd() + connectionsSection;
     const finalTags = extractInlineTags(updatedContent);
 
     const updated = await conditionalUpdateNote(
       noteId,
-      new Date(snapshotUpdatedAt),
+      freshNote.updatedAt,
       { content: updatedContent, tags: finalTags },
       db
     );
