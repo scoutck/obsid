@@ -1,6 +1,6 @@
-import { searchNotes, getNote, createNote, updateNote } from "@/lib/notes";
+import { searchNotes, getNote, createNote, updateNote, searchByTags, getNotesByPerson, getNoteGraph, searchByTimeframe } from "@/lib/notes";
 import { listPeople, getPersonByAlias, addNotePerson } from "@/lib/people";
-import { semanticSearch } from "@/lib/embeddings";
+import { semanticSearch, type EmbeddingCache } from "@/lib/embeddings";
 import { createPendingPerson } from "@/lib/pending-people";
 import { prisma as defaultPrisma } from "@/lib/db";
 import type { PrismaClient } from "@prisma/client";
@@ -93,18 +93,64 @@ export const vaultTools: Anthropic.Tool[] = [
       required: ["name", "context"],
     },
   },
+  {
+    name: "search_by_tags",
+    description: "Find notes that have any of the given tags. Useful for finding thematically grouped notes.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        tags: { type: "array", items: { type: "string" }, description: "Tags to search for" },
+      },
+      required: ["tags"],
+    },
+  },
+  {
+    name: "search_by_person",
+    description: "Find all notes that mention or are linked to a specific person. Use their name or any known alias.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string", description: "Person name or alias to search for" },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "get_note_graph",
+    description: "Follow [[wiki-links]] from a note to discover connected notes. Returns notes up to N hops away.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        noteId: { type: "string", description: "The UUID of the starting note" },
+        depth: { type: "number", description: "How many hops to follow (default 2, max 3)" },
+      },
+      required: ["noteId"],
+    },
+  },
+  {
+    name: "search_by_timeframe",
+    description: "Find notes created or updated within a date range. Useful for finding temporal clusters.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        startDate: { type: "string", description: "Start date (ISO format, e.g., 2026-01-01)" },
+        endDate: { type: "string", description: "End date (ISO format, e.g., 2026-01-31)" },
+      },
+      required: ["startDate", "endDate"],
+    },
+  },
 ];
 
 export async function executeTool(
   name: string,
   input: Record<string, unknown>,
-  meta?: { sourceNoteId?: string; sourceConversationId?: string; cookie?: string },
+  meta?: { sourceNoteId?: string; sourceConversationId?: string; cookie?: string; embeddingCache?: EmbeddingCache },
   db: PrismaClient = defaultPrisma
 ): Promise<string> {
   switch (name) {
     case "semantic_search": {
       try {
-        const results = await semanticSearch(input.query as string, (input.limit as number) ?? 10, db);
+        const results = await semanticSearch(input.query as string, (input.limit as number) ?? 10, db, meta?.embeddingCache);
         if (results.length === 0) return "No notes found matching that query.";
         const notes = await Promise.all(
           results.map(async (r) => {
@@ -197,7 +243,47 @@ export async function executeTool(
       return `Flagged "${input.name}" as pending — user will review`;
     }
 
+    case "search_by_tags": {
+      const tags = input.tags as string[];
+      const notes = await searchByTags(tags, db);
+      if (notes.length === 0) return "No notes found with those tags.";
+      return notes.slice(0, 20).map((n) =>
+        `- **${n.title || "Untitled"}** (id: ${n.id})\n  Tags: ${n.tags.join(", ")}\n  Preview: ${n.content.slice(0, 150)}...`
+      ).join("\n\n");
+    }
+
+    case "search_by_person": {
+      const notes = await getNotesByPerson(input.name as string, db);
+      if (notes.length === 0) return `No notes found mentioning "${input.name}".`;
+      return notes.slice(0, 20).map((n) =>
+        `- **${n.title || "Untitled"}** (id: ${n.id})\n  Preview: ${n.content.slice(0, 150)}...`
+      ).join("\n\n");
+    }
+
+    case "get_note_graph": {
+      const depth = Math.min((input.depth as number) ?? 2, 3);
+      const graph = await getNoteGraph(input.noteId as string, depth, db);
+      if (graph.length === 0) return "No linked notes found.";
+      return graph.map((entry) =>
+        `- **${entry.note.title || "Untitled"}** (id: ${entry.note.id}, ${entry.depth} hop${entry.depth > 1 ? "s" : ""} away)\n  Preview: ${entry.note.content.slice(0, 150)}...`
+      ).join("\n\n");
+    }
+
+    case "search_by_timeframe": {
+      const start = new Date(input.startDate as string);
+      const end = new Date(input.endDate as string);
+      const notes = await searchByTimeframe(start, end, db);
+      if (notes.length === 0) return "No notes found in that timeframe.";
+      return notes.slice(0, 20).map((n) =>
+        `- **${n.title || "Untitled"}** (id: ${n.id}, updated: ${n.updatedAt.toISOString().split("T")[0]})\n  Preview: ${n.content.slice(0, 150)}...`
+      ).join("\n\n");
+    }
+
     default:
       return `Unknown tool: ${name}`;
   }
 }
+
+const WRITE_TOOLS = new Set(["create_note", "update_note", "update_person", "create_pending_person"]);
+
+export const readOnlyVaultTools = vaultTools.filter((t) => !WRITE_TOOLS.has(t.name));
