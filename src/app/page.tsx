@@ -45,6 +45,7 @@ export default function Home() {
   const [showPeopleModal, setShowPeopleModal] = useState(false);
   const [showAiPrompt, setShowAiPrompt] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [toastDuration, setToastDuration] = useState(3000);
   const [mode, setMode] = useState<"notes" | "chat">("notes");
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [showNewPerson, setShowNewPerson] = useState(false);
@@ -394,6 +395,7 @@ export default function Home() {
           : currentContent.split("\n")[0]?.slice(0, 100) || "";
         const links = extractWikiLinks(currentContent);
         const tags = extractInlineTags(currentContent);
+        setToastDuration(120000);
         setToast("Thinking deeply...");
         fetch(`/api/notes/${noteId}`, {
           method: "PUT",
@@ -406,6 +408,7 @@ export default function Home() {
             body: JSON.stringify({ noteId }),
           }))
           .then(async (res) => {
+            setToastDuration(3000);
             if (!res.ok) {
               setToast("Think failed");
               return;
@@ -422,7 +425,10 @@ export default function Home() {
               setToast("No connections found");
             }
           })
-          .catch(() => setToast("Think failed"));
+          .catch(() => {
+            setToastDuration(3000);
+            setToast("Think failed");
+          });
         return;
       }
 
@@ -775,7 +781,7 @@ export default function Home() {
         />
       )}
       {toast && (
-        <Toast message={toast} onDismiss={() => setToast(null)} />
+        <Toast message={toast} onDismiss={() => setToast(null)} duration={toastDuration} />
       )}
 
       {showNewPerson && (
