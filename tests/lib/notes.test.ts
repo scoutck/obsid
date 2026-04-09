@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   createNote,
@@ -16,6 +17,13 @@ import { prisma } from "@/lib/db";
 beforeEach(async () => {
   await prisma.notePerson.deleteMany();
   await prisma.personMeta.deleteMany();
+  await prisma.pendingPerson.deleteMany();
+  await prisma.command.deleteMany();
+  await prisma.embedding.deleteMany();
+  await prisma.message.deleteMany();
+  await prisma.conversation.deleteMany();
+  await prisma.userInsight.deleteMany();
+  await prisma.task.deleteMany();
   await prisma.note.deleteMany();
 });
 
