@@ -6,6 +6,8 @@ import { createCommand, updateCommand } from "@/lib/commands";
 
 const anthropic = new Anthropic();
 
+const MAX_TOOL_ROUNDS = 10;
+
 export async function POST(request: NextRequest) {
   const db = getDb(request);
   const cookie = request.headers.get("cookie") ?? "";
@@ -59,26 +61,40 @@ You have tools to search, read, create, and update notes. Execute the user's ins
       messages,
     });
 
-    while (response.stop_reason === "tool_use") {
+    let toolRounds = 0;
+    while (response.stop_reason === "tool_use" && toolRounds < MAX_TOOL_ROUNDS) {
+      toolRounds++;
       const assistantContent = response.content;
       messages.push({ role: "assistant", content: assistantContent });
 
-      const toolResults: Anthropic.ToolResultBlockParam[] = [];
-      for (const block of assistantContent) {
-        if (block.type === "tool_use") {
-          const result = await executeTool(
-            block.name,
-            block.input as Record<string, unknown>,
-            { sourceNoteId: noteId, cookie },
-            db
-          );
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: block.id,
-            content: result,
-          });
-        }
-      }
+      const toolBlocks = assistantContent.filter(
+        (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
+      );
+
+      const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+        toolBlocks.map(async (block) => {
+          try {
+            const result = await executeTool(
+              block.name,
+              block.input as Record<string, unknown>,
+              { sourceNoteId: noteId, cookie },
+              db
+            );
+            return {
+              type: "tool_result" as const,
+              tool_use_id: block.id,
+              content: result,
+            };
+          } catch (err) {
+            return {
+              type: "tool_result" as const,
+              tool_use_id: block.id,
+              content: `Error: ${err instanceof Error ? err.message : "Tool execution failed"}`,
+              is_error: true,
+            };
+          }
+        })
+      );
 
       messages.push({ role: "user", content: toolResults });
 
