@@ -1,0 +1,212 @@
+import { NextRequest } from "next/server";
+import { getDb } from "@/lib/db";
+import Anthropic from "@anthropic-ai/sdk";
+import { readOnlyVaultTools, executeTool } from "@/lib/ai-tools";
+import { getNote, conditionalUpdateNote } from "@/lib/notes";
+import { loadEmbeddingCache } from "@/lib/embeddings";
+import { createUserInsights } from "@/lib/user-insights";
+import { embedNote } from "@/lib/embeddings";
+import { extractInlineTags } from "@/lib/tags";
+
+const anthropic = new Anthropic();
+const MAX_TOOL_ROUNDS = 10;
+
+interface ThinkResult {
+  connections: string;
+  insights: Array<{ category: string; content: string; evidence?: string }>;
+}
+
+export async function POST(request: NextRequest) {
+  const db = getDb(request);
+  const { noteId } = await request.json();
+
+  const note = await getNote(noteId, db);
+  if (!note) {
+    return Response.json({ error: "Note not found" }, { status: 404 });
+  }
+
+  const snapshotUpdatedAt = note.updatedAt.getTime();
+
+  // Pre-load embedding cache for multi-query efficiency
+  const embeddingCache = await loadEmbeddingCache(db);
+
+  const systemPrompt = `You are a deep reasoning engine for a personal knowledge base called Obsid. Your job is to find meaningful connections between the current note and other notes in the vault.
+
+## Current note
+Title: ${note.title}
+Content:
+${note.content}
+
+## Your task
+Explore the vault using the tools available to you. Search by meaning, by people, by tags, by time, and by following wiki-links. Read promising notes in full. Then identify connections that the user might not see themselves.
+
+## Connection types to look for
+- **Contradictions**: The user said X here but Y in another note
+- **Evolution**: Their thinking on a topic shifted over time
+- **Recurring patterns**: The same dynamic or tension appearing across notes
+- **Unresolved tensions**: Questions or conflicts they keep circling without resolving
+- **Causal chains**: A decision in one note led to an outcome in another
+
+## How to explore
+1. Start by thinking about what this note is really about — the themes beneath the surface
+2. Search semantically for related notes
+3. Search by people mentioned, tags used, and time period
+4. Follow wiki-links to discover the note's neighborhood
+5. Read the most promising notes in full
+6. Think carefully about HOW they connect — not just that they're similar
+
+## Output format
+Return valid JSON (no markdown fences):
+{
+  "connections": "Markdown text with [[wiki-links]] explaining each connection and WHY it matters. Use bullet points.",
+  "insights": [{"category": "behavior|self-reflection|expertise|thinking-pattern", "content": "insight text", "evidence": "quote from note"}]
+}
+
+The connections text should be specific and reference note content. Not "these notes are related" but "in [[Note X]] you described feeling Y, and here you're experiencing the same tension from a different angle."
+
+If you find no meaningful connections, return: {"connections": "", "insights": []}`;
+
+  const messages: Anthropic.MessageParam[] = [
+    {
+      role: "user",
+      content: "Find deep connections between this note and the rest of my vault. Use the tools to explore thoroughly.",
+    },
+  ];
+
+  let response;
+  try {
+    response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 16000,
+      system: systemPrompt,
+      tools: readOnlyVaultTools,
+      messages,
+      thinking: {
+        type: "enabled",
+        budget_tokens: 5000,
+      },
+    });
+  } catch (err) {
+    console.error("[think] AI request failed:", err);
+    return Response.json({ error: "AI request failed" }, { status: 502 });
+  }
+
+  let toolRounds = 0;
+  while (response.stop_reason === "tool_use" && toolRounds < MAX_TOOL_ROUNDS) {
+    toolRounds++;
+    const assistantContent = response.content;
+    messages.push({ role: "assistant", content: assistantContent });
+
+    const toolBlocks = assistantContent.filter(
+      (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
+    );
+
+    const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+      toolBlocks.map(async (block) => {
+        try {
+          const result = await executeTool(
+            block.name,
+            block.input as Record<string, unknown>,
+            { sourceNoteId: noteId, embeddingCache },
+            db
+          );
+          return {
+            type: "tool_result" as const,
+            tool_use_id: block.id,
+            content: result,
+          };
+        } catch (err) {
+          return {
+            type: "tool_result" as const,
+            tool_use_id: block.id,
+            content: `Error: ${err instanceof Error ? err.message : "Tool execution failed"}`,
+            is_error: true,
+          };
+        }
+      })
+    );
+
+    messages.push({ role: "user", content: toolResults });
+
+    try {
+      response = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 16000,
+        system: systemPrompt,
+        tools: readOnlyVaultTools,
+        messages,
+        thinking: {
+          type: "enabled",
+          budget_tokens: 5000,
+        },
+      });
+    } catch (err) {
+      console.error("[think] AI request failed during tool loop:", err);
+      return Response.json({ error: "AI request failed" }, { status: 502 });
+    }
+  }
+
+  // Extract final text
+  let resultText = "";
+  for (const block of response.content) {
+    if (block.type === "text") resultText += block.text;
+  }
+
+  // Strip markdown fences if present
+  resultText = resultText
+    .replace(/^```(?:json)?\s*\n?/i, "")
+    .replace(/\n?```\s*$/i, "")
+    .trim();
+
+  let result: ThinkResult;
+  try {
+    result = JSON.parse(resultText);
+  } catch {
+    console.error("[think] Failed to parse AI response:", resultText.slice(0, 200));
+    return Response.json({ error: "Failed to parse AI response" }, { status: 500 });
+  }
+
+  // Append connections to note content
+  let connectionsAdded = false;
+  if (result.connections && result.connections.trim()) {
+    const connectionsSection = `\n\n---\n**Connections**\n${result.connections.trim()}\n`;
+    const updatedContent = note.content.trimEnd() + connectionsSection;
+    const finalTags = extractInlineTags(updatedContent);
+
+    const updated = await conditionalUpdateNote(
+      noteId,
+      new Date(snapshotUpdatedAt),
+      { content: updatedContent, tags: finalTags },
+      db
+    );
+
+    if (updated) {
+      connectionsAdded = true;
+      // Re-embed with connections included
+      embedNote(noteId, note.title, updatedContent, db, note.summary).catch(
+        (err) => console.error("[think] embedNote failed:", err)
+      );
+    }
+  }
+
+  // Store user insights
+  let insightsAdded = 0;
+  if (result.insights && result.insights.length > 0) {
+    const created = await createUserInsights(
+      result.insights.map((i) => ({
+        category: i.category,
+        content: i.content,
+        evidence: i.evidence ?? "",
+        sourceNoteId: noteId,
+      })),
+      db
+    );
+    insightsAdded = created.length;
+  }
+
+  return Response.json({
+    connectionsAdded,
+    insightsAdded,
+    connections: result.connections || "",
+  });
+}
