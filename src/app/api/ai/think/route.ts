@@ -3,9 +3,8 @@ import { getDb } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { readOnlyVaultTools, executeTool } from "@/lib/ai-tools";
 import { getNote, conditionalUpdateNote } from "@/lib/notes";
-import { loadEmbeddingCache } from "@/lib/embeddings";
+import { loadEmbeddingCache, embedNote } from "@/lib/embeddings";
 import { createUserInsights } from "@/lib/user-insights";
-import { embedNote } from "@/lib/embeddings";
 import { extractInlineTags } from "@/lib/tags";
 
 const anthropic = new Anthropic();

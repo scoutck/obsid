@@ -240,8 +240,14 @@ export async function searchByTags(
 ): Promise<Note[]> {
   if (tags.length === 0) return [];
 
-  const conditions = tags.map(() => `tags LIKE ?`).join(" OR ");
-  const params = tags.map((t) => `%"${t}"%`);
+  // Cap to prevent unbounded OR conditions
+  const safeTags = tags.slice(0, 50);
+  const conditions = safeTags.map(() => `tags LIKE ? ESCAPE '\\'`).join(" OR ");
+  // Escape LIKE metacharacters in tag values
+  const params = safeTags.map((t) => {
+    const escaped = t.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+    return `%"${escaped}"%`;
+  });
 
   const raw = await db.$queryRawUnsafe<
     Array<{
@@ -324,7 +330,8 @@ export async function getNoteGraph(
     if (allLinkTitles.size === 0) break;
 
     // Resolve titles to notes — use case-insensitive title matching
-    const titleArray = [...allLinkTitles];
+    // Cap to prevent unbounded OR conditions
+    const titleArray = [...allLinkTitles].slice(0, 50);
     const conditions = titleArray.map(() => `LOWER(title) = ?`).join(" OR ");
     const params = titleArray.map((t) => t.toLowerCase());
 
