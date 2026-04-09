@@ -56,8 +56,10 @@ export async function embedText(text: string): Promise<Float32Array> {
   return new Float32Array(data.data[0].embedding);
 }
 
-export async function embedNote(noteId: string, title: string, content: string, db: PrismaClient = defaultPrisma): Promise<void> {
-  const text = `${title}\n${content}`.trim();
+export async function embedNote(noteId: string, title: string, content: string, db: PrismaClient = defaultPrisma, summary: string = ""): Promise<void> {
+  const text = summary
+    ? `${title}\n${summary}\n${content}`.trim()
+    : `${title}\n${content}`.trim();
   if (!text) return;
 
   let vector: Float32Array;
@@ -83,15 +85,14 @@ export async function embedNote(noteId: string, title: string, content: string, 
   }
 }
 
-export async function semanticSearch(
-  query: string,
-  limit: number = 10,
+export interface EmbeddingCache {
+  items: Array<{ id: string; vector: Float32Array }>;
+}
+
+export async function loadEmbeddingCache(
   db: PrismaClient = defaultPrisma
-): Promise<Array<{ noteId: string; score: number }>> {
-  const queryVector = await embedText(query);
-
+): Promise<EmbeddingCache> {
   const embeddings = await db.embedding.findMany();
-
   const items = embeddings.map((e) => ({
     id: e.noteId,
     vector: new Float32Array(
@@ -100,6 +101,27 @@ export async function semanticSearch(
       e.vector.byteLength / 4
     ),
   }));
+  return { items };
+}
+
+export async function semanticSearch(
+  query: string,
+  limit: number = 10,
+  db: PrismaClient = defaultPrisma,
+  cache?: EmbeddingCache
+): Promise<Array<{ noteId: string; score: number }>> {
+  const queryVector = await embedText(query);
+
+  const items = cache
+    ? cache.items
+    : (await db.embedding.findMany()).map((e) => ({
+        id: e.noteId,
+        vector: new Float32Array(
+          e.vector.buffer,
+          e.vector.byteOffset,
+          e.vector.byteLength / 4
+        ),
+      }));
 
   return rankBySimilarity(queryVector, items, limit).map((r) => ({
     noteId: r.id,

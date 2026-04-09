@@ -12,6 +12,8 @@ import { listPeople } from "@/lib/people";
 
 const anthropic = new Anthropic();
 
+const MAX_TOOL_ROUNDS = 10;
+
 export async function POST(request: NextRequest) {
   const db = getDb(request);
   const cookie = request.headers.get("cookie") ?? "";
@@ -84,40 +86,59 @@ Be concise and helpful. When you use tools, briefly confirm what you did.`;
   // Tool-use loop
   const fullMessages = [...messages];
   const allToolCalls: Array<{ name: string; input: Record<string, unknown> }> = [];
-  while (response.stop_reason === "tool_use") {
+  let toolRounds = 0;
+  while (response.stop_reason === "tool_use" && toolRounds < MAX_TOOL_ROUNDS) {
+    toolRounds++;
     const assistantContent = response.content;
     fullMessages.push({ role: "assistant", content: assistantContent });
 
-    const toolResults: Anthropic.ToolResultBlockParam[] = [];
-    for (const block of assistantContent) {
-      if (block.type === "tool_use") {
-        const result = await executeTool(
-          block.name,
-          block.input as Record<string, unknown>,
-          { sourceConversationId: conversationId, cookie },
-          db
-        );
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: block.id,
-          content: result,
-        });
-        allToolCalls.push({
-          name: block.name,
-          input: block.input as Record<string, unknown>,
-        });
-      }
-    }
+    const toolBlocks = assistantContent.filter(
+      (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
+    );
+
+    const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+      toolBlocks.map(async (block) => {
+        try {
+          const result = await executeTool(
+            block.name,
+            block.input as Record<string, unknown>,
+            { sourceConversationId: conversationId, cookie },
+            db
+          );
+          allToolCalls.push({
+            name: block.name,
+            input: block.input as Record<string, unknown>,
+          });
+          return {
+            type: "tool_result" as const,
+            tool_use_id: block.id,
+            content: result,
+          };
+        } catch (err) {
+          return {
+            type: "tool_result" as const,
+            tool_use_id: block.id,
+            content: `Error: ${err instanceof Error ? err.message : "Tool execution failed"}`,
+            is_error: true,
+          };
+        }
+      })
+    );
 
     fullMessages.push({ role: "user", content: toolResults });
 
-    response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1024,
-      system: systemPrompt,
-      tools: vaultTools,
-      messages: fullMessages,
-    });
+    try {
+      response = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1024,
+        system: systemPrompt,
+        tools: vaultTools,
+        messages: fullMessages,
+      });
+    } catch (err) {
+      console.error("[chat] AI request failed in tool loop:", err);
+      return Response.json({ error: "AI request failed" }, { status: 502 });
+    }
   }
 
   // Extract final text

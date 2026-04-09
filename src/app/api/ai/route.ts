@@ -5,6 +5,8 @@ import { vaultTools, executeTool } from "@/lib/ai-tools";
 
 const anthropic = new Anthropic();
 
+const MAX_TOOL_ROUNDS = 10;
+
 export async function POST(request: NextRequest) {
   const db = getDb(request);
   const cookie = request.headers.get("cookie") ?? "";
@@ -33,38 +35,8 @@ Respond concisely. Use markdown formatting.`;
 
   let finalText = "";
 
-  let response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 1024,
-    system: systemPrompt,
-    tools: vaultTools,
-    messages,
-  });
-
-  // Handle tool use loop
-  while (response.stop_reason === "tool_use") {
-    const assistantContent = response.content;
-    messages.push({ role: "assistant", content: assistantContent });
-
-    const toolResults: Anthropic.ToolResultBlockParam[] = [];
-    for (const block of assistantContent) {
-      if (block.type === "tool_use") {
-        const result = await executeTool(
-          block.name,
-          block.input as Record<string, unknown>,
-          { cookie },
-          db
-        );
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: block.id,
-          content: result,
-        });
-      }
-    }
-
-    messages.push({ role: "user", content: toolResults });
-
+  let response;
+  try {
     response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1024,
@@ -72,6 +44,61 @@ Respond concisely. Use markdown formatting.`;
       tools: vaultTools,
       messages,
     });
+  } catch (err) {
+    console.error("[ask] AI request failed:", err);
+    return new Response("AI request failed", { status: 502 });
+  }
+
+  // Handle tool use loop
+  let toolRounds = 0;
+  while (response.stop_reason === "tool_use" && toolRounds < MAX_TOOL_ROUNDS) {
+    toolRounds++;
+    const assistantContent = response.content;
+    messages.push({ role: "assistant", content: assistantContent });
+
+    const toolBlocks = assistantContent.filter(
+      (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
+    );
+
+    const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+      toolBlocks.map(async (block) => {
+        try {
+          const result = await executeTool(
+            block.name,
+            block.input as Record<string, unknown>,
+            { cookie },
+            db
+          );
+          return {
+            type: "tool_result" as const,
+            tool_use_id: block.id,
+            content: result,
+          };
+        } catch (err) {
+          return {
+            type: "tool_result" as const,
+            tool_use_id: block.id,
+            content: `Error: ${err instanceof Error ? err.message : "Tool execution failed"}`,
+            is_error: true,
+          };
+        }
+      })
+    );
+
+    messages.push({ role: "user", content: toolResults });
+
+    try {
+      response = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1024,
+        system: systemPrompt,
+        tools: vaultTools,
+        messages,
+      });
+    } catch (err) {
+      console.error("[ask] AI request failed in tool loop:", err);
+      return new Response("AI request failed", { status: 502 });
+    }
   }
 
   for (const block of response.content) {

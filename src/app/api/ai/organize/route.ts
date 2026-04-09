@@ -127,6 +127,36 @@ Return JSON in this exact format:
     return Response.json({ error: "Failed to parse AI response" }, { status: 500 });
   }
 
+  // Generate semantic summary via Haiku (fast, cheap)
+  let summary = "";
+  if (content.trim().length > 50) {
+    try {
+      const summaryResponse = await anthropic.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 300,
+        messages: [
+          {
+            role: "user",
+            content: `Analyze this note and extract its underlying themes, tensions, and meaning in 2-3 sentences. Not a synopsis — what is this note REALLY about? What emotions, questions, or patterns are present beneath the surface?
+
+Title: ${title}
+Content:
+${content}
+
+Return only the summary text, nothing else.`,
+          },
+        ],
+      });
+      for (const block of summaryResponse.content) {
+        if (block.type === "text") summary += block.text;
+      }
+      summary = summary.trim();
+    } catch (err) {
+      console.error("[organize] Summary generation failed:", err);
+      // Non-fatal — continue without summary
+    }
+  }
+
   // Use the original content from the request (not a re-fetch) to avoid
   // race conditions with auto-save modifying the note while AI was processing.
   let updatedContent = content;
@@ -168,6 +198,7 @@ Return JSON in this exact format:
     {
       content: updatedContent,
       tags: finalTags,
+      summary,
     },
     db
   );
@@ -204,7 +235,7 @@ Return JSON in this exact format:
   }
 
   // Fire-and-forget embedding trigger
-  embedNote(noteId, title, updatedContent, db).catch((err) =>
+  embedNote(noteId, title, updatedContent, db, summary).catch((err) =>
     console.error("[organize] embedNote failed:", err)
   );
 
