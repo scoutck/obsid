@@ -195,6 +195,12 @@ If you find no meaningful connections, return: {"connections": "", "insights": [
     .replace(/\n?```\s*$/i, "")
     .trim();
 
+  // Extract JSON from response — Claude sometimes writes preamble text before the JSON
+  const jsonMatch = resultText.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    resultText = jsonMatch[0];
+  }
+
   // Empty response — AI used all tokens on thinking/tools and produced no output
   if (!resultText) {
     console.warn("[think] Empty response from AI");
