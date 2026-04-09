@@ -152,11 +152,23 @@ If you find no meaningful connections, return: {"connections": "", "insights": [
     if (block.type === "text") resultText += block.text;
   }
 
+  console.log(`[think] stop_reason=${response.stop_reason}, toolRounds=${toolRounds}, textLength=${resultText.length}, blocks=${response.content.map((b) => b.type).join(",")}`);
+
   // Strip markdown fences if present
   resultText = resultText
     .replace(/^```(?:json)?\s*\n?/i, "")
     .replace(/\n?```\s*$/i, "")
     .trim();
+
+  // Empty response — AI used all tokens on thinking/tools and produced no output
+  if (!resultText) {
+    console.warn("[think] Empty response from AI");
+    return Response.json({
+      connectionsAdded: false,
+      insightsAdded: 0,
+      connections: "",
+    });
+  }
 
   let result: ThinkResult;
   try {
