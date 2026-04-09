@@ -10,6 +10,7 @@ export interface Note {
   id: string;
   title: string;
   content: string;
+  summary: string;
   tags: string[];
   type: string;
   links: string[];
@@ -96,6 +97,7 @@ export function parseNote(raw: {
   id: string;
   title: string;
   content: string;
+  summary?: string;
   tags: string;
   type: string;
   links: string;
@@ -107,6 +109,7 @@ export function parseNote(raw: {
     id: raw.id,
     title: raw.title,
     content: raw.content,
+    summary: raw.summary ?? "",
     tags: safeParseArray(raw.tags),
     type: raw.type,
     links: safeParseArray(raw.links),

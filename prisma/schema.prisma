@@ -10,6 +10,7 @@ model Note {
   id               String   @id @default(uuid())
   title            String   @default("")
   content          String   @default("")
+  summary          String   @default("")
   tags             String   @default("[]")
   type             String   @default("")
   links            String   @default("[]")
