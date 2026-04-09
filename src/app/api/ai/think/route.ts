@@ -163,8 +163,14 @@ If you find no meaningful connections, return: {"connections": "", "insights": [
   try {
     result = JSON.parse(resultText);
   } catch {
-    console.error("[think] Failed to parse AI response:", resultText.slice(0, 200));
-    return Response.json({ error: "Failed to parse AI response" }, { status: 500 });
+    // AI returned text instead of JSON — likely no meaningful connections found.
+    // Return gracefully instead of 500.
+    console.warn("[think] AI returned non-JSON response:", resultText.slice(0, 200));
+    return Response.json({
+      connectionsAdded: false,
+      insightsAdded: 0,
+      connections: "",
+    });
   }
 
   // Append connections to note content
