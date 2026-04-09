@@ -379,6 +379,40 @@ export default function Home() {
         return;
       }
 
+      if (command.action === "ai:think") {
+        if (!noteId) return;
+        // Cancel pending auto-save to avoid stale detection
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+          saveTimeoutRef.current = null;
+        }
+        setToast("Thinking deeply...");
+        fetch("/api/ai/think", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ noteId }),
+        })
+          .then(async (res) => {
+            if (!res.ok) {
+              setToast("Think failed");
+              return;
+            }
+            const result = await res.json();
+            if (result.connectionsAdded) {
+              loadNote(noteId);
+              const parts: string[] = [];
+              if (result.connections) parts.push("connections found");
+              if (result.insightsAdded > 0)
+                parts.push(`${result.insightsAdded} insights`);
+              setToast(parts.join(", ") || "No connections found");
+            } else {
+              setToast("No connections found");
+            }
+          })
+          .catch(() => setToast("Think failed"));
+        return;
+      }
+
       if (command.action === "task:create") {
         setShowTaskInput(true);
         return;
