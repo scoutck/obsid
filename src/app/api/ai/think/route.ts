@@ -8,7 +8,7 @@ import { createUserInsights } from "@/lib/user-insights";
 import { extractInlineTags } from "@/lib/tags";
 
 const anthropic = new Anthropic();
-const MAX_TOOL_ROUNDS = 10;
+const MAX_TOOL_ROUNDS = 8;
 
 interface ThinkResult {
   connections: string;
@@ -142,6 +142,41 @@ If you find no meaningful connections, return: {"connections": "", "insights": [
       });
     } catch (err) {
       console.error("[think] AI request failed during tool loop:", err);
+      return Response.json({ error: "AI request failed" }, { status: 502 });
+    }
+  }
+
+  // If we hit the tool round limit and the last response was still tool_use,
+  // force a final call WITHOUT tools so Claude must produce text output.
+  if (response.stop_reason === "tool_use") {
+    console.log("[think] Hit tool round limit, forcing final response");
+    const assistantContent = response.content;
+    messages.push({ role: "assistant", content: assistantContent });
+
+    const toolBlocks = assistantContent.filter(
+      (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
+    );
+    // Return empty results for pending tool calls
+    const toolResults: Anthropic.ToolResultBlockParam[] = toolBlocks.map((block) => ({
+      type: "tool_result" as const,
+      tool_use_id: block.id,
+      content: "Tool limit reached. Please synthesize your findings and return the JSON response now.",
+    }));
+    messages.push({ role: "user", content: toolResults });
+
+    try {
+      response = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages,
+        thinking: {
+          type: "enabled",
+          budget_tokens: 2000,
+        },
+      });
+    } catch (err) {
+      console.error("[think] Final forced response failed:", err);
       return Response.json({ error: "AI request failed" }, { status: 502 });
     }
   }
