@@ -259,8 +259,9 @@ describe("searchByTimeframe", () => {
 
   it("orders results by updatedAt desc", async () => {
     const note1 = await createNote({ title: "First" });
-    // Small delay to ensure different updatedAt
     const note2 = await createNote({ title: "Second" });
+    // Force note2 to have a later updatedAt by updating it
+    await updateNote(note2.id, { content: "updated" });
 
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
