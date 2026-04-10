@@ -1,13 +1,56 @@
 @import "tailwindcss";
 
 :root {
-  --background: #faf9f6;
-  --foreground: #1c1c1e;
+  /* Backgrounds */
+  --bg-primary: #faf9f6;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f5f4f1;
+  --bg-overlay: rgba(0, 0, 0, 0.2);
+
+  /* Text */
+  --text-primary: #1c1c1e;
+  --text-body: #27272a;
+  --text-secondary: #52525b;
+  --text-tertiary: #a1a1aa;
+  --text-disabled: #d4d4d8;
+
+  /* Borders */
+  --border-default: #e4e4e7;
+  --border-subtle: #f4f4f5;
+  --border-strong: #d4d4d8;
+
+  /* Accent */
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-subtle: #e0e7ff;
+  --accent-muted: rgba(99, 102, 241, 0.15);
+  --accent-text: #4338ca;
+
+  /* Semantic */
+  --code-text: #78350f;
+  --code-bg: rgba(120, 53, 15, 0.06);
+  --highlight-bg: rgba(250, 204, 21, 0.25);
+  --tag-text: #4f46e5;
+  --link-underline: rgba(79, 70, 229, 0.35);
+  --strikethrough: #a1a1aa;
+  --error: #dc2626;
+  --error-subtle: #f87171;
+
+  /* AI */
+  --ai-label: #6d28d9;
+  --ai-bg: #faf5ff;
+  --ai-border: #ede9fe;
+
+  /* Fonts (fallbacks — next/font/google injects the real values) */
+  --font-body: Georgia, "Times New Roman", serif;
+  --font-ui: system-ui, -apple-system, sans-serif;
+  --font-mono: "Fira Code", "Cascadia Code", monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
 }
 
 /* CodeMirror overrides */
@@ -15,6 +58,7 @@ body {
   height: 100%;
   font-size: 16px;
   line-height: 1.7;
+  font-family: var(--font-body);
 }
 
 .cm-editor .cm-content {
@@ -34,19 +78,66 @@ body {
 /* Horizontal rule in editor */
 .cm-hr {
   border: none;
-  border-top: 1px solid #d4d4d8;
+  border-top: 1px solid var(--border-strong);
   margin: 1em 0;
 }
 
 /* Wiki-link styling */
 .cm-wiki-link {
-  color: #4f46e5;
+  color: var(--accent);
   cursor: pointer;
   text-decoration: underline;
-  text-decoration-color: rgba(79, 70, 229, 0.4);
+  text-decoration-color: var(--link-underline);
   text-underline-offset: 2px;
+  transition: text-decoration-color 120ms ease-in-out;
 }
 
 .cm-wiki-link:hover {
-  text-decoration-color: #4f46e5;
+  text-decoration-color: var(--accent);
+}
+
+/* Animation keyframes */
+@keyframes modal-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes save-pulse {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
 }
