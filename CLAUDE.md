@@ -90,7 +90,9 @@ Every note is embedded on save via Voyage AI (`voyage-3`, 1024 dims). `src/lib/e
 
 ### Think system
 
-`src/app/api/ai/think/route.ts` — `/think` slash command for deep note reasoning. Tool-use loop with extended thinking and read-only vault tools (`readOnlyVaultTools` from `ai-tools.ts`). Explores the vault via `semantic_search`, `read_note`, `search_by_tags`, `search_by_person`, `get_note_graph`, `search_by_timeframe`. Appends a `**Connections**` section to the note with `[[wiki-links]]` and reasoning. Also writes `UserInsight` entries. On-demand only (user invokes `/think`). Re-fetches note before writing to avoid stale `updatedAt`. Forces a final no-tools API call if tool round limit (8) is hit.
+`src/app/api/ai/think/route.ts` — per-note deep reasoning endpoint. Tool-use loop with extended thinking and read-only vault tools (`readOnlyVaultTools` from `ai-tools.ts`). Explores the vault via `semantic_search`, `read_note`, `search_by_tags`, `search_by_person`, `get_note_graph`, `search_by_timeframe`. Appends a `**Connections**` section to the note. Writes `UserInsight` entries with `source: "think"`. Routes people insights to person notes via `addNotePerson`. Re-fetches note before writing to avoid stale `updatedAt`. Forces a final no-tools API call if tool round limit (8) is hit.
+
+Think is triggered as a vault-wide sweep from the `/me` page (button in `UserProfilePage.tsx`), not a slash command. The client fetches pending notes via `GET /api/ai/think-sweep/pending` (notes with `updatedAt > lastThinkAt`), then calls `/api/ai/think` per note sequentially with progress UI. `lastThinkAt` is derived from the most recent `UserInsight` where `source = "think"` — no separate tracking table. Person notes (`type: "person"`) are excluded from sweeps.
 
 Organize generates a semantic `summary` (Haiku call) on every note close, stored in `Note.summary`. Embeddings use `title + summary + content` for richer semantic search. `loadEmbeddingCache()` pre-loads all embeddings for multi-query `/think` calls.
 
@@ -168,3 +170,5 @@ Vitest with `fileParallelism: false` (SQLite concurrency). `tests/setup.ts` crea
 - **Tool-use loops can exhaust rounds without producing text.** When `stop_reason === "tool_use"` after hitting `MAX_TOOL_ROUNDS`, the response has no text blocks. Force a final API call WITHOUT tools to make Claude synthesize its findings.
 - **AI JSON responses may include preamble text.** Claude sometimes writes explanatory text before the JSON object despite prompt instructions. Extract JSON with `resultText.match(/\{[\s\S]*\}/)` as a fallback after fence stripping.
 - **Toast duration must be extended for long-running operations.** The default 3s auto-dismiss is too short for `/think` (10-30s). Pass a longer `duration` prop and reset to 3000 when the operation completes.
+- **Remote migration required after every schema change.** Run `set -a && source .env.local && set +a && npx tsx scripts/migrate-all-user-dbs.ts` after deploying schema changes. This is easy to forget and causes immediate production crashes.
+- **Think sweep re-processes notes it modified.** When `/think` appends connections, it bumps `updatedAt`. The next sweep sees that note as "changed." Acceptable for now — the insights accumulate, and re-analysis with new vault context can surface new patterns.
