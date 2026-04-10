@@ -64,8 +64,8 @@ export default function PendingPeopleModal({ onConfirm, onClose }: PendingPeople
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-      <div className="w-full max-w-md rounded-xl bg-white shadow-xl border border-zinc-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 animate-[modal-overlay-in_200ms_ease-out]">
+      <div className="w-full max-w-md rounded-xl bg-white shadow-xl border border-zinc-200 animate-[modal-content-in_250ms_ease-out]">
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100">
           <h2 className="font-semibold text-zinc-900">Pending People</h2>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 text-sm">

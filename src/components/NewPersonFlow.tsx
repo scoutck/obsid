@@ -55,8 +55,8 @@ export default function NewPersonFlow({ prefillName, onComplete, onCancel }: New
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-      <div className="w-full max-w-sm bg-white rounded-xl shadow-xl border border-zinc-200 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 animate-[modal-overlay-in_200ms_ease-out]">
+      <div className="w-full max-w-sm bg-white rounded-xl shadow-xl border border-zinc-200 p-4 animate-[modal-content-in_250ms_ease-out]">
         <h2 className="text-sm font-semibold text-zinc-500 mb-3">New Person</h2>
 
         <div className="space-y-3">

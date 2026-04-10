@@ -71,8 +71,8 @@ export default function NoteSearchModal({ onSelect, onClose }: NoteSearchModalPr
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/20">
-      <div className="bg-white border border-zinc-200 rounded-lg shadow-lg w-full max-w-md overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/20 animate-[modal-overlay-in_200ms_ease-out]">
+      <div className="bg-white border border-zinc-200 rounded-xl shadow-lg w-full max-w-md overflow-hidden animate-[modal-content-in_250ms_ease-out]">
         <input
           ref={inputRef}
           type="text"
@@ -86,7 +86,7 @@ export default function NoteSearchModal({ onSelect, onClose }: NoteSearchModalPr
           {results.map((note, i) => (
             <button
               key={note.id}
-              className={`w-full text-left px-4 py-2 hover:bg-zinc-100 ${
+              className={`w-full text-left px-4 py-2 hover:bg-zinc-100 transition-colors duration-[120ms] ${
                 i === selectedIndex ? "bg-zinc-100" : ""
               }`}
               onMouseEnter={() => setSelectedIndex(i)}

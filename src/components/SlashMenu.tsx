@@ -61,7 +61,7 @@ export default function SlashMenu({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 bg-white border border-zinc-200 rounded-lg shadow-lg py-1 w-64 max-h-72 overflow-y-auto"
+      className="fixed z-50 bg-white border border-zinc-200 rounded-[10px] shadow-lg py-1 w-[280px] max-h-[360px] overflow-y-auto animate-[menu-in_150ms_ease-out]"
       style={{ top: position.top, left: position.left }}
     >
       {filtered.map((cmd, i) => {
@@ -70,13 +70,13 @@ export default function SlashMenu({
         return (
           <div key={cmd.action}>
             {showCategory && (
-              <div className="px-3 py-1 text-xs text-zinc-500 font-medium uppercase tracking-wide">
+              <div className="px-3 py-1.5 text-[11px] text-zinc-400 font-semibold uppercase tracking-wider mt-1 first:mt-0">
                 {cmd.category}
               </div>
             )}
             <button
-              className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-zinc-100 ${
-                i === selectedIndex ? "bg-zinc-100" : ""
+              className={`w-full text-left px-3 py-2.5 flex items-center justify-between hover:bg-[var(--bg-subtle)] transition-colors duration-[120ms] ${
+                i === selectedIndex ? "bg-[var(--bg-subtle)]" : ""
               }`}
               onMouseEnter={() => setSelectedIndex(i)}
               onClick={() => onSelect(cmd)}

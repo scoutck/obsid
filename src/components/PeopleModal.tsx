@@ -30,8 +30,8 @@ export default function PeopleModal({ onViewPerson, onClose }: PeopleModalProps)
   useEffect(() => { fetchData(); }, [fetchData]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-      <div className="w-full max-w-md rounded-xl bg-white shadow-xl border border-zinc-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 animate-[modal-overlay-in_200ms_ease-out]">
+      <div className="w-full max-w-md rounded-xl bg-white shadow-xl border border-zinc-200 animate-[modal-content-in_250ms_ease-out]">
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100">
           <h2 className="font-semibold text-zinc-900">People</h2>
           <button
@@ -58,7 +58,7 @@ export default function PeopleModal({ onViewPerson, onClose }: PeopleModalProps)
                 people.map((person) => (
                   <div
                     key={person.note.id}
-                    className="flex items-center justify-between py-1.5 cursor-pointer hover:bg-zinc-50 -mx-2 px-2 rounded"
+                    className="flex items-center justify-between py-1.5 cursor-pointer hover:bg-zinc-50 -mx-2 px-2 rounded transition-colors duration-[120ms]"
                     onClick={() => onViewPerson(person.note.id)}
                   >
                     <div>

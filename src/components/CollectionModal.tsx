@@ -52,8 +52,8 @@ export default function CollectionModal({ mode, onSelectNote, onClose }: Collect
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/20">
-      <div className="bg-white border border-zinc-200 rounded-lg shadow-lg w-full max-w-md overflow-hidden" onKeyDown={handleKeyDown}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/20 animate-[modal-overlay-in_200ms_ease-out]">
+      <div className="bg-white border border-zinc-200 rounded-lg shadow-lg w-full max-w-md overflow-hidden animate-[modal-content-in_250ms_ease-out]" onKeyDown={handleKeyDown}>
         {mode === "new" ? (
           <div className="p-4 space-y-3">
             <h3 className="text-sm font-medium text-zinc-700">New Collection</h3>
