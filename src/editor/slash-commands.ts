@@ -4,6 +4,7 @@ export interface SlashCommand {
   description: string;
   action: string;
   mode?: "notes" | "chat";
+  aliases?: string[];
 }
 
 export const slashCommands: SlashCommand[] = [
@@ -12,8 +13,8 @@ export const slashCommands: SlashCommand[] = [
   { label: "Italic", category: "Formatting", description: "Wrap with *", action: "format:italic", mode: "notes" },
   { label: "Strikethrough", category: "Formatting", description: "Wrap with ~~", action: "format:strikethrough", mode: "notes" },
   { label: "Highlight", category: "Formatting", description: "Wrap with ==", action: "format:highlight", mode: "notes" },
-  { label: "Heading 1", category: "Formatting", description: "Insert #", action: "format:h1", mode: "notes" },
-  { label: "Heading 2", category: "Formatting", description: "Insert ##", action: "format:h2", mode: "notes" },
+  { label: "Heading 1", category: "Formatting", description: "Insert #", action: "format:h1", mode: "notes", aliases: ["h1"] },
+  { label: "Heading 2", category: "Formatting", description: "Insert ##", action: "format:h2", mode: "notes", aliases: ["h2"] },
   { label: "Bullet List", category: "Formatting", description: "Insert -", action: "format:bullet", mode: "notes" },
   { label: "Numbered List", category: "Formatting", description: "Insert 1.", action: "format:number", mode: "notes" },
   { label: "Divider", category: "Formatting", description: "Insert ---", action: "format:divider", mode: "notes" },
@@ -56,9 +57,13 @@ export function filterCommands(query: string, mode?: "notes" | "chat"): SlashCom
   const matches = commands.filter((cmd) =>
     cmd.label.toLowerCase().startsWith(lower) ||
     cmd.description.toLowerCase().includes(lower) ||
-    cmd.category.toLowerCase().includes(lower)
+    cmd.category.toLowerCase().includes(lower) ||
+    cmd.aliases?.some((a) => a.toLowerCase().startsWith(lower))
   );
   matches.sort((a, b) => {
+    const aAlias = a.aliases?.some((al) => al.toLowerCase() === lower) ? -1 : 0;
+    const bAlias = b.aliases?.some((al) => al.toLowerCase() === lower) ? -1 : 0;
+    if (aAlias !== bAlias) return aAlias - bAlias;
     const aStarts = a.label.toLowerCase().startsWith(lower) ? 0 : 1;
     const bStarts = b.label.toLowerCase().startsWith(lower) ? 0 : 1;
     return aStarts - bStarts;

@@ -276,10 +276,15 @@ export default function Editor({ initialContent = "", initialCommands, onChange,
               const coords = update.view.coordsAtPos(slashPos);
 
               if (coords) {
+                const menuHeight = 288; // max-h-72
+                const spaceBelow = window.innerHeight - coords.bottom;
+                const top = spaceBelow < menuHeight
+                  ? coords.top - menuHeight - 4
+                  : coords.bottom + 4;
                 setSlashMenu({
                   open: true,
                   query,
-                  position: { top: coords.bottom + 4, left: coords.left },
+                  position: { top, left: coords.left },
                   slashPos,
                 });
               }
@@ -296,10 +301,15 @@ export default function Editor({ initialContent = "", initialCommands, onChange,
               const hashPos = cursorPos - hashMatch[0].length;
               const coords = update.view.coordsAtPos(hashPos);
               if (coords) {
+                const menuHeight = 288;
+                const spaceBelow = window.innerHeight - coords.bottom;
+                const top = spaceBelow < menuHeight
+                  ? coords.top - menuHeight - 4
+                  : coords.bottom + 4;
                 setTagMenu({
                   open: true,
                   query: tagQuery,
-                  position: { top: coords.bottom + 4, left: coords.left },
+                  position: { top, left: coords.left },
                   hashPos,
                 });
               }
