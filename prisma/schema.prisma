@@ -114,8 +114,10 @@ model UserInsight {
   content      String
   evidence     String   @default("")
   sourceNoteId String?
+  source       String   @default("organize")
   createdAt    DateTime @default(now())
 
   @@index([category])
   @@index([sourceNoteId])
+  @@index([source])
 }

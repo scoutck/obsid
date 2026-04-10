@@ -167,6 +167,7 @@ export interface UserInsight {
   content: string;
   evidence: string;
   sourceNoteId: string | null;
+  source: "organize" | "think";
   createdAt: Date;
 }
 
@@ -176,11 +177,13 @@ export function parseUserInsight(raw: {
   content: string;
   evidence: string;
   sourceNoteId: string | null;
+  source?: string;
   createdAt: Date;
 }): UserInsight {
   return {
     ...raw,
     category: raw.category as UserInsight["category"],
+    source: (raw.source as UserInsight["source"]) ?? "organize",
   };
 }
 
