@@ -6,6 +6,7 @@ import { EditorState } from "@codemirror/state";
 import { markdown } from "@codemirror/lang-markdown";
 import { GFM } from "@lezer/markdown";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import { markdownPreview } from "@/editor/markdown-preview";
 import { wikiLinkDecorations } from "@/editor/wiki-links";
@@ -220,8 +221,9 @@ export default function Editor({ initialContent = "", initialCommands, onChange,
             },
           },
         ]),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
         history(),
+        closeBrackets(),
         markdown({ extensions: [GFM] }),
         syntaxHighlighting(defaultHighlightStyle),
         markdownPreview,

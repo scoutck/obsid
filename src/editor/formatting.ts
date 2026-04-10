@@ -15,8 +15,13 @@ const wrapFormats: Record<string, string> = {
 const lineFormats: Record<string, string> = {
   "format:h1": "# ",
   "format:h2": "## ",
+  "format:h3": "### ",
+  "format:h4": "#### ",
+  "format:h5": "##### ",
+  "format:h6": "###### ",
   "format:bullet": "- ",
   "format:number": "1. ",
+  "format:checkbox": "- [ ] ",
 };
 
 export function applyFormatting(

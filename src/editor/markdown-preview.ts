@@ -106,16 +106,20 @@ export const markdownPreview = ViewPlugin.fromClass(
             }
           }
 
-          // Headings: # or ##
+          // Headings: # through ######
           if (
             node.name === "ATXHeading1" ||
-            node.name === "ATXHeading2"
+            node.name === "ATXHeading2" ||
+            node.name === "ATXHeading3" ||
+            node.name === "ATXHeading4" ||
+            node.name === "ATXHeading5" ||
+            node.name === "ATXHeading6"
           ) {
             if (active) {
               decorations.push(headingStyle.range(node.from, node.to));
             } else {
               const line = view.state.doc.lineAt(node.from);
-              const hashMatch = line.text.match(/^(#{1,2})\s/);
+              const hashMatch = line.text.match(/^(#{1,6})\s/);
               if (hashMatch) {
                 const markerEnd = node.from + hashMatch[0].length;
                 decorations.push(hideMarker.range(node.from, markerEnd));

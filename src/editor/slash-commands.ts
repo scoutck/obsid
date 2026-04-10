@@ -15,8 +15,13 @@ export const slashCommands: SlashCommand[] = [
   { label: "Highlight", category: "Formatting", description: "Wrap with ==", action: "format:highlight", mode: "notes" },
   { label: "Heading 1", category: "Formatting", description: "Insert #", action: "format:h1", mode: "notes", aliases: ["h1"] },
   { label: "Heading 2", category: "Formatting", description: "Insert ##", action: "format:h2", mode: "notes", aliases: ["h2"] },
+  { label: "Heading 3", category: "Formatting", description: "Insert ###", action: "format:h3", mode: "notes", aliases: ["h3"] },
+  { label: "Heading 4", category: "Formatting", description: "Insert ####", action: "format:h4", mode: "notes", aliases: ["h4"] },
+  { label: "Heading 5", category: "Formatting", description: "Insert #####", action: "format:h5", mode: "notes", aliases: ["h5"] },
+  { label: "Heading 6", category: "Formatting", description: "Insert ######", action: "format:h6", mode: "notes", aliases: ["h6"] },
   { label: "Bullet List", category: "Formatting", description: "Insert -", action: "format:bullet", mode: "notes" },
   { label: "Numbered List", category: "Formatting", description: "Insert 1.", action: "format:number", mode: "notes" },
+  { label: "Checkbox", category: "Formatting", description: "Insert - [ ]", action: "format:checkbox", mode: "notes" },
   { label: "Divider", category: "Formatting", description: "Insert ---", action: "format:divider", mode: "notes" },
   // Notes (both modes)
   { label: "New Note", category: "Notes", description: "Create a new note", action: "note:new" },
