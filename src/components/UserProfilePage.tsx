@@ -106,12 +106,16 @@ export default function UserProfilePage({ onSelectNote, onBack }: UserProfilePag
       });
 
       try {
-        await fetch("/api/ai/think", {
+        const res = await fetch("/api/ai/think", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ noteId: note.id }),
         });
-        processed++;
+        if (res.ok) {
+          processed++;
+        } else {
+          console.error(`[think-sweep] Server error for note ${note.id}: ${res.status}`);
+        }
       } catch {
         console.error(`[think-sweep] Failed to process note ${note.id}`);
       }

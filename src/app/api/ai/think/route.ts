@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { readOnlyVaultTools, executeTool } from "@/lib/ai-tools";
 import { getNote, conditionalUpdateNote, updateNote } from "@/lib/notes";
-import { getPersonByAlias } from "@/lib/people";
+import { getPersonByAlias, addNotePerson } from "@/lib/people";
 import { loadEmbeddingCache, embedNote } from "@/lib/embeddings";
 import { createUserInsights } from "@/lib/user-insights";
 import { extractInlineTags } from "@/lib/tags";
@@ -288,6 +288,8 @@ If you find no meaningful connections, return: {"connections": "", "insights": [
       const timestamp = new Date().toISOString().split("T")[0];
       const appendText = `\n\n_${timestamp} (think):_ ${pi.observation}`;
       await updateNote(person.note.id, { content: existingNote.content + appendText }, db);
+      // Record the note-person link (matching update_person pattern in ai-tools.ts)
+      await addNotePerson(noteId, person.note.id, db);
       peopleInsightsAdded++;
 
       // Fire-and-forget person summary regeneration
