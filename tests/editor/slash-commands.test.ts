@@ -18,6 +18,12 @@ describe("slashCommands", () => {
       expect(cmd.action).toBeDefined();
     }
   });
+
+  it("each command has an icon field", () => {
+    for (const cmd of slashCommands) {
+      expect(cmd.icon).toBeTruthy();
+    }
+  });
 });
 
 describe("filterCommands", () => {

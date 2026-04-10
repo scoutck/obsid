@@ -2,6 +2,16 @@
 
 import { useState, useEffect, useRef } from "react";
 import { filterCommands, type SlashCommand } from "@/editor/slash-commands";
+import * as icons from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+const iconMap = icons as unknown as Record<string, LucideIcon>;
+
+function CommandIcon({ name }: { name: string }) {
+  const Icon = iconMap[name];
+  if (!Icon) return null;
+  return <Icon size={16} strokeWidth={1.75} className="text-zinc-400 shrink-0" />;
+}
 
 interface SlashMenuProps {
   query: string;
@@ -50,7 +60,7 @@ export default function SlashMenu({
   }, [filtered, selectedIndex, onSelect, onClose]);
 
   useEffect(() => {
-    const el = menuRef.current?.children[selectedIndex] as HTMLElement;
+    const el = menuRef.current?.querySelector(`[data-index="${selectedIndex}"]`) as HTMLElement;
     el?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
@@ -75,14 +85,16 @@ export default function SlashMenu({
               </div>
             )}
             <button
-              className={`w-full text-left px-3 py-2.5 flex items-center justify-between hover:bg-[var(--bg-subtle)] transition-colors duration-[120ms] ${
+              data-index={i}
+              className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 hover:bg-[var(--bg-subtle)] transition-colors duration-[120ms] ${
                 i === selectedIndex ? "bg-[var(--bg-subtle)]" : ""
               }`}
               onMouseEnter={() => setSelectedIndex(i)}
               onClick={() => onSelect(cmd)}
             >
-              <span className="text-sm text-zinc-800">{cmd.label}</span>
-              <span className="text-xs text-zinc-500">{cmd.description}</span>
+              <CommandIcon name={cmd.icon} />
+              <span className="text-sm text-zinc-800 flex-1">{cmd.label}</span>
+              <span className="text-xs text-zinc-400">{cmd.description}</span>
             </button>
           </div>
         );
