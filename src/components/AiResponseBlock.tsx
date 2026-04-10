@@ -30,10 +30,10 @@ export default function AiResponseBlock({ prompt, response, isLoading, onKeep, o
   }, [handleKeyDown]);
 
   return (
-    <div className="my-3 rounded-lg border border-zinc-200 bg-white shadow-sm overflow-hidden">
-      <div className="px-4 py-2 bg-zinc-50 border-b border-zinc-100 flex items-center justify-between">
+    <div className="my-3 rounded-lg border border-[var(--ai-border)] bg-[var(--ai-bg)] shadow-sm overflow-hidden">
+      <div className="px-4 py-2 bg-white/60 border-b border-[var(--ai-border)] flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-indigo-600">Claude</span>
+          <span className="text-xs font-medium text-[var(--ai-label)]">Claude</span>
           <span className="text-xs text-zinc-400 truncate">{prompt}</span>
         </div>
         {!isLoading && response && (
@@ -43,7 +43,7 @@ export default function AiResponseBlock({ prompt, response, isLoading, onKeep, o
           </div>
         )}
       </div>
-      <div className="px-4 py-3 text-sm text-zinc-700 whitespace-pre-wrap leading-relaxed">
+      <div className="px-4 py-3 text-sm text-zinc-700 whitespace-pre-wrap leading-relaxed font-[var(--font-body)]">
         {isLoading ? (
           <span className="text-zinc-400 animate-pulse">Thinking...</span>
         ) : (
