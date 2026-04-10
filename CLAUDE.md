@@ -88,6 +88,12 @@ Every note is embedded on save via Voyage AI (`voyage-3`, 1024 dims). `src/lib/e
 
 `src/app/api/ai/command/route.ts` — `/claude` inline commands. Tool-use loop like Ask Claude. Stores command + confirmation in the `Command` table (not in note content). `GET /api/notes/[id]/commands` fetches commands for a note.
 
+### Think system
+
+`src/app/api/ai/think/route.ts` — `/think` slash command for deep note reasoning. Tool-use loop with extended thinking and read-only vault tools (`readOnlyVaultTools` from `ai-tools.ts`). Explores the vault via `semantic_search`, `read_note`, `search_by_tags`, `search_by_person`, `get_note_graph`, `search_by_timeframe`. Appends a `**Connections**` section to the note with `[[wiki-links]]` and reasoning. Also writes `UserInsight` entries. On-demand only (user invokes `/think`). Re-fetches note before writing to avoid stale `updatedAt`. Forces a final no-tools API call if tool round limit (8) is hit.
+
+Organize generates a semantic `summary` (Haiku call) on every note close, stored in `Note.summary`. Embeddings use `title + summary + content` for richer semantic search. `loadEmbeddingCache()` pre-loads all embeddings for multi-query `/think` calls.
+
 ### Person system
 
 Person = Note with `type: "person"` + `PersonMeta` (aliases, role, summary, userContext). `NotePerson` join table tracks mentions (with `highlight` field). `src/lib/people.ts` handles CRUD with case-insensitive alias resolution (returns null for ambiguous matches).
@@ -97,6 +103,10 @@ Person = Note with `type: "person"` + `PersonMeta` (aliases, role, summary, user
 `/newperson` command: stepped inline flow (name → role → context). Creates person note + PersonMeta + auto-generates aliases.
 
 `/api/ai/person-summary` — regenerates AI-maintained relationship summary for a person. Fire-and-forget on new person-note links.
+
+### User profile system
+
+`UserInsight` table stores raw AI-harvested observations about the user (category, content, evidence, sourceNoteId). The organize endpoint's prompt is extended to detect self-reflective writing and store insights automatically. `/me` slash command opens `UserProfilePage`, which fetches all insights and sends them to `/api/ai/user-profile` for on-demand synthesis into a structured profile (summary, expertise, patterns, thinking style). `src/lib/user-insights.ts` has CRUD.
 
 ### Tag system
 
@@ -109,7 +119,7 @@ Vitest with `fileParallelism: false` (SQLite concurrency). `tests/setup.ts` crea
 **Test patterns:**
 - Import `{ prisma } from "@/lib/db"` for direct DB access in tests (uses test.db singleton).
 - Create test data via lib functions (`createNote()`, `createPerson()`), not raw Prisma calls.
-- `beforeEach` cleanup must respect FK constraints — delete in order: `notePerson` → `personMeta` → `pendingPerson` → `command` → `embedding` → `message` → `conversation` → `note`.
+- `beforeEach` cleanup must respect FK constraints — delete in order: `notePerson` → `personMeta` → `pendingPerson` → `command` → `embedding` → `message` → `conversation` → `userInsight` → `task` → `note`.
 - Test directories: `tests/lib/` (unit), `tests/api/` (API), `tests/editor/` (editor), `tests/workflows/` (integration), `tests/edge-cases/` (stress tests), `tests/e2e/` (Playwright).
 - FTS5 table doesn't exist in test DB — `searchNotes()` always uses LIKE fallback in tests.
 
@@ -133,6 +143,7 @@ Vitest with `fileParallelism: false` (SQLite concurrency). `tests/setup.ts` crea
 - **`VOYAGE_API_KEY` must be set for semantic search.** Without it, embeddings fail silently and search falls back to FTS5. Add to `.env.local`.
 - **Chat messages are not notes.** Chat is stored in `Conversation`/`Message` tables, not in Note content. Don't confuse the two.
 - **Person summaries regenerate on link.** Fire-and-forget POST to `/api/ai/person-summary`. Receives current summary as input to preserve user edits.
+- **AI JSON responses may include markdown fences.** Claude sometimes wraps JSON in ` ```json ``` ` despite prompt instructions. All AI routes that parse JSON from Claude should strip fences: `resultText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim()`.
 - **`proxy.ts` is Next.js 16 proxy (not middleware).** Next.js 16 renamed `middleware.ts` to `proxy.ts`. The exported function must be named `proxy`. It handles auth + per-user DB header injection.
 - **`adminPrisma` is a lazy proxy.** `src/lib/admin-db.ts` uses a Proxy to defer client creation until first use. This prevents build-time crashes when `ADMIN_DATABASE_URL` isn't set.
 - **All lib functions accept optional `db` param.** Every exported function in `notes.ts`, `people.ts`, `conversations.ts`, etc. takes `db: PrismaClient = defaultPrisma` as its last parameter. API routes pass `getDb(request)` for per-user routing.
@@ -148,6 +159,12 @@ Vitest with `fileParallelism: false` (SQLite concurrency). `tests/setup.ts` crea
 - **Never loop with individual queries.** Use `findMany({ where: { id: { in: ids } } })` + a Map instead of looping with `findUnique`. Use `Promise.all` for independent awaits in API routes. This is how every N+1 in `people.ts` was introduced.
 - **Batch helpers exist — use them.** `getPersonsByAliases(aliases, db)` resolves multiple aliases with one DB load (vs `getPersonByAlias` per alias). `addNotePeople(noteId, personNoteIds, db)` batch-creates links. `getNotesByIds(ids, db)` batch-fetches notes. Prefer these over sequential single-item calls.
 - **Dev mode skips remote Turso routing.** The proxy bypasses `getUserCredentials` + header injection when `NODE_ENV !== "production"`, so `getDb()` falls through to local `dev.db`. Without this, every local dev query round-trips to remote Turso (~20s page loads).
-- **DELETE `/api/notes/[id]` cascade order matters.** The handler cleans up: commands → embeddings → notePerson (both `noteId` and `personNoteId` directions) → personMeta → pendingPerson (nullify sourceNoteId) → note. All directions are covered — follow this order when adding new related tables.
+- **DELETE `/api/notes/[id]` cascade order matters.** The handler cleans up: commands → embeddings → notePerson (both `noteId` and `personNoteId` directions) → personMeta → pendingPerson (nullify sourceNoteId) → userInsight → tasks (nullify noteId) → note. All directions are covered — follow this order when adding new related tables.
 - **Parse functions use safe JSON helpers.** `parseNote()`, `parsePersonMeta()`, `parseChatMessage()` use `safeParseArray()`/`safeParseJson()` from `src/types/index.ts`. Malformed JSON returns fallback values (empty arrays/objects) instead of throwing.
 - **Modal components use `next/dynamic`.** All conditionally-rendered components in `page.tsx` (modals, ChatView, PersonPage) are lazy-loaded. New modal/overlay components should follow the same pattern. Editor and Toast are static imports (always rendered / tiny).
+- **Schema changes require remote migration.** After adding columns/tables and deploying, run `set -a && source .env.local && set +a && npx tsx scripts/migrate-all-user-dbs.ts` to apply to all user Turso DBs. Without this, production crashes with `no such column` errors.
+- **FTS5 corruption affects remote Turso DBs too.** Same fix as local: drop triggers + table, recreate, repopulate. The FTS5 `rebuild` command does NOT work through Prisma's libsql adapter. Must manually `INSERT INTO notes_fts SELECT ... FROM Note` to repopulate.
+- **`conditionalUpdateNote` fails silently when client saves first.** If the client PUTs content before calling an API endpoint that later uses `conditionalUpdateNote`, the `updatedAt` snapshot is stale. Re-fetch the note right before writing to get the current `updatedAt`.
+- **Tool-use loops can exhaust rounds without producing text.** When `stop_reason === "tool_use"` after hitting `MAX_TOOL_ROUNDS`, the response has no text blocks. Force a final API call WITHOUT tools to make Claude synthesize its findings.
+- **AI JSON responses may include preamble text.** Claude sometimes writes explanatory text before the JSON object despite prompt instructions. Extract JSON with `resultText.match(/\{[\s\S]*\}/)` as a fallback after fence stripping.
+- **Toast duration must be extended for long-running operations.** The default 3s auto-dismiss is too short for `/think` (10-30s). Pass a longer `duration` prop and reset to 3000 when the operation completes.
