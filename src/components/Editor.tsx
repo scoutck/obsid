@@ -23,32 +23,39 @@ import type { CommandData } from "@/types";
 const theme = EditorView.theme({
   "&": {
     backgroundColor: "transparent",
-    color: "#27272a",
+    color: "var(--text-body)",
   },
   ".cm-cursor": {
-    borderLeftColor: "#27272a",
+    borderLeftColor: "var(--text-primary)",
     borderLeftWidth: "2px",
   },
   "&.cm-focused .cm-cursor": {
-    borderLeftColor: "#27272a",
+    borderLeftColor: "var(--text-primary)",
   },
   ".cm-content": {
-    caretColor: "#27272a",
+    caretColor: "var(--text-primary)",
   },
   ".cm-activeLine": {
-    backgroundColor: "rgba(0, 0, 0, 0.03)",
+    backgroundColor: "rgba(0, 0, 0, 0.02)",
   },
   ".cm-selectionBackground, ::selection": {
-    backgroundColor: "rgba(99, 102, 241, 0.2) !important",
+    backgroundColor: "var(--accent-muted) !important",
   },
   ".cm-gutters": {
     display: "none",
   },
+  // Heading hierarchy — per-level sizing
   ".cm-heading": {
     fontWeight: "700",
-    fontSize: "1.25em",
-    color: "#18181b",
+    color: "var(--text-primary)",
+    letterSpacing: "-0.01em",
   },
+  ".cm-heading-1": { fontSize: "1.5em" },
+  ".cm-heading-2": { fontSize: "1.25em" },
+  ".cm-heading-3": { fontWeight: "600", fontSize: "1.125em", color: "#27272a" },
+  ".cm-heading-4": { fontWeight: "600", fontSize: "1em", color: "#27272a" },
+  ".cm-heading-5": { fontWeight: "600", fontSize: "0.875em", color: "#3f3f46" },
+  ".cm-heading-6": { fontWeight: "600", fontSize: "0.875em", color: "#3f3f46", fontStyle: "italic" },
   ".cm-bold": {
     fontWeight: "700",
   },
@@ -57,29 +64,31 @@ const theme = EditorView.theme({
   },
   ".cm-strikethrough": {
     textDecoration: "line-through",
-    color: "#a1a1aa",
+    color: "var(--strikethrough)",
   },
   ".cm-highlight": {
-    backgroundColor: "rgba(250, 204, 21, 0.3)",
+    backgroundColor: "var(--highlight-bg)",
     borderRadius: "2px",
+    padding: "0 2px",
   },
   ".cm-inline-code": {
-    backgroundColor: "rgba(0, 0, 0, 0.06)",
+    backgroundColor: "var(--code-bg)",
     borderRadius: "3px",
-    padding: "0 4px",
-    fontFamily: "monospace",
-    color: "#dc2626",
+    padding: "1px 5px",
+    fontFamily: "var(--font-mono)",
+    fontSize: "0.9em",
+    color: "var(--code-text)",
   },
   ".cm-tag": {
-    color: "#6366f1",
+    color: "var(--tag-text)",
     fontWeight: "600",
   },
   ".cm-claude-line": {
-    color: "#a1a1aa",
+    color: "var(--text-tertiary)",
     fontStyle: "italic",
   },
   ".cm-claude-confirm": {
-    color: "#a1a1aa",
+    color: "var(--text-tertiary)",
     fontSize: "0.9em",
   },
 });
