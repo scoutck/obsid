@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Task } from "@/types";
+import { X } from "lucide-react";
 
 interface TaskModalProps {
   onNavigateToNote: (noteId: string) => void;
@@ -108,9 +109,9 @@ export default function TaskModal({ onNavigateToNote, onClose }: TaskModalProps)
           <h2 className="font-semibold text-zinc-900">Tasks</h2>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-600 text-sm"
+            className="text-zinc-400 hover:text-zinc-600 transition-colors duration-[120ms] p-1 -m-1"
           >
-            Close
+            <X size={18} strokeWidth={1.75} />
           </button>
         </div>
 
