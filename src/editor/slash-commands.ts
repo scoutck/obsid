@@ -39,7 +39,6 @@ export const slashCommands: SlashCommand[] = [
   { label: "Ask Claude", category: "AI", description: "Ask AI about your notes", action: "ai:ask", mode: "notes" },
   { label: "Organize", category: "AI", description: "AI-tag and link this note", action: "ai:organize", mode: "notes" },
   { label: "Claude Command", category: "AI", description: "Inline AI instruction", action: "ai:claude", mode: "notes" },
-  { label: "Think", category: "AI", description: "Find deep connections for this note", action: "ai:think", mode: "notes" },
   // Mode
   { label: "Chat Mode", category: "Mode", description: "Switch to chat", action: "mode:chat", mode: "notes" },
   { label: "Notes Mode", category: "Mode", description: "Switch to notes", action: "mode:notes", mode: "chat" },
