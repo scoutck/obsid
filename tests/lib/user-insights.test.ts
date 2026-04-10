@@ -6,6 +6,7 @@ import {
   getUserInsights,
   getUserInsightsByCategory,
   deleteUserInsight,
+  getLastThinkAt,
 } from "@/lib/user-insights";
 import { createNote } from "@/lib/notes";
 import { prisma } from "@/lib/db";
@@ -92,5 +93,21 @@ describe("deleteUserInsight", () => {
     await deleteUserInsight(insight.id);
     const all = await getUserInsights();
     expect(all).toHaveLength(0);
+  });
+});
+
+describe("getLastThinkAt", () => {
+  it("returns null when no think insights exist", async () => {
+    const result = await getLastThinkAt();
+    expect(result).toBeNull();
+  });
+
+  it("returns the most recent think insight createdAt", async () => {
+    await createUserInsight({ category: "behavior", content: "organize insight", source: "organize" });
+    await createUserInsight({ category: "behavior", content: "think insight", source: "think" });
+
+    const result = await getLastThinkAt();
+    expect(result).not.toBeNull();
+    expect(result).toBeInstanceOf(Date);
   });
 });

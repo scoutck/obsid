@@ -45,7 +45,6 @@ export default function Home() {
   const [showPeopleModal, setShowPeopleModal] = useState(false);
   const [showAiPrompt, setShowAiPrompt] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [toastDuration, setToastDuration] = useState(3000);
   const [mode, setMode] = useState<"notes" | "chat">("notes");
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [showNewPerson, setShowNewPerson] = useState(false);
@@ -377,58 +376,6 @@ export default function Home() {
           selection: { anchor: pos + 8 },
         });
         view.focus();
-        return;
-      }
-
-      if (command.action === "ai:think") {
-        if (!noteId) return;
-        // Cancel pending auto-save and flush current content so /think
-        // reasons about the latest version, not a stale DB snapshot.
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-          saveTimeoutRef.current = null;
-        }
-        const currentContent = contentRef.current;
-        const titleMatch = currentContent.match(/^#\s+(.+)$/m);
-        const title = titleMatch
-          ? titleMatch[1]
-          : currentContent.split("\n")[0]?.slice(0, 100) || "";
-        const links = extractWikiLinks(currentContent);
-        const tags = extractInlineTags(currentContent);
-        setToastDuration(120000);
-        setToast("Thinking deeply...");
-        fetch(`/api/notes/${noteId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, content: currentContent, links, tags }),
-        })
-          .then(() => fetch("/api/ai/think", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ noteId }),
-          }))
-          .then(async (res) => {
-            setToastDuration(3000);
-            if (!res.ok) {
-              setToast("Think failed");
-              return;
-            }
-            const result = await res.json();
-            if (result.connectionsAdded) {
-              loadNote(noteId);
-              const parts: string[] = [];
-              if (result.connections) parts.push("connections found");
-              if (result.insightsAdded > 0)
-                parts.push(`${result.insightsAdded} insights`);
-              setToast(parts.join(", ") || "No connections found");
-            } else {
-              setToast("No connections found");
-            }
-          })
-          .catch(() => {
-            setToastDuration(3000);
-            setToast("Think failed");
-          });
         return;
       }
 
@@ -781,7 +728,7 @@ export default function Home() {
         />
       )}
       {toast && (
-        <Toast message={toast} onDismiss={() => setToast(null)} duration={toastDuration} />
+        <Toast message={toast} onDismiss={() => setToast(null)} />
       )}
 
       {showNewPerson && (

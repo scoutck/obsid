@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { readOnlyVaultTools, executeTool } from "@/lib/ai-tools";
-import { getNote, conditionalUpdateNote } from "@/lib/notes";
+import { getNote, conditionalUpdateNote, updateNote } from "@/lib/notes";
+import { getPersonByAlias, addNotePerson } from "@/lib/people";
 import { loadEmbeddingCache, embedNote } from "@/lib/embeddings";
 import { createUserInsights } from "@/lib/user-insights";
 import { extractInlineTags } from "@/lib/tags";
@@ -13,6 +14,7 @@ const MAX_TOOL_ROUNDS = 8;
 interface ThinkResult {
   connections: string;
   insights: Array<{ category: string; content: string; evidence?: string }>;
+  peopleInsights?: Array<{ name: string; observation: string }>;
 }
 
 export async function POST(request: NextRequest) {
@@ -59,12 +61,15 @@ Explore the vault using the tools available to you. Search by meaning, by people
 Return valid JSON (no markdown fences):
 {
   "connections": "Markdown text with [[wiki-links]] explaining each connection and WHY it matters. Use bullet points.",
-  "insights": [{"category": "behavior|self-reflection|expertise|thinking-pattern", "content": "insight text", "evidence": "quote from note"}]
+  "insights": [{"category": "behavior|self-reflection|expertise|thinking-pattern", "content": "insight text", "evidence": "quote from note"}],
+  "peopleInsights": [{"name": "Person Name", "observation": "what you discovered about this person across notes"}]
 }
 
 The connections text should be specific and reference note content. Not "these notes are related" but "in [[Note X]] you described feeling Y, and here you're experiencing the same tension from a different angle."
 
-If you find no meaningful connections, return: {"connections": "", "insights": []}`;
+peopleInsights should capture observations about specific people — patterns in how the user interacts with them, how the person's role or behavior appears across notes. Use the person's primary name as listed in the known people list.
+
+If you find no meaningful connections, return: {"connections": "", "insights": [], "peopleInsights": []}`;
 
   const messages: Anthropic.MessageParam[] = [
     {
@@ -263,15 +268,46 @@ If you find no meaningful connections, return: {"connections": "", "insights": [
         content: i.content,
         evidence: i.evidence ?? "",
         sourceNoteId: noteId,
+        source: "think",
       })),
       db
     );
     insightsAdded = created.length;
   }
 
+  // Route people insights to person notes
+  let peopleInsightsAdded = 0;
+  if (result.peopleInsights && result.peopleInsights.length > 0) {
+    for (const pi of result.peopleInsights) {
+      const person = await getPersonByAlias(pi.name, db);
+      if (!person) continue;
+
+      const existingNote = await getNote(person.note.id, db);
+      if (!existingNote) continue;
+
+      const timestamp = new Date().toISOString().split("T")[0];
+      const appendText = `\n\n_${timestamp} (think):_ ${pi.observation}`;
+      await updateNote(person.note.id, { content: existingNote.content + appendText }, db);
+      // Record the note-person link (matching update_person pattern in ai-tools.ts)
+      await addNotePerson(noteId, person.note.id, db);
+      peopleInsightsAdded++;
+
+      // Fire-and-forget person summary regeneration
+      fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/ai/person-summary`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(cookie ? { Cookie: cookie } : {}),
+        },
+        body: JSON.stringify({ personNoteId: person.note.id }),
+      }).catch(() => {});
+    }
+  }
+
   return Response.json({
     connectionsAdded,
     insightsAdded,
+    peopleInsightsAdded,
     connections: result.connections || "",
   });
 }

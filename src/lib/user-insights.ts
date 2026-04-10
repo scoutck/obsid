@@ -7,6 +7,7 @@ interface CreateUserInsightInput {
   content: string;
   evidence?: string;
   sourceNoteId?: string;
+  source?: string;
 }
 
 const VALID_CATEGORIES = ["self-reflection", "expertise", "behavior", "thinking-pattern"];
@@ -22,6 +23,7 @@ export async function createUserInsight(
       content: input.content,
       evidence: input.evidence ?? "",
       sourceNoteId: input.sourceNoteId ?? null,
+      source: input.source ?? "organize",
     },
   });
   return parseUserInsight(raw);
@@ -58,6 +60,17 @@ export async function getUserInsightsByCategory(
     orderBy: { createdAt: "desc" },
   });
   return rows.map(parseUserInsight);
+}
+
+export async function getLastThinkAt(
+  db: PrismaClient = defaultPrisma
+): Promise<Date | null> {
+  const latest = await db.userInsight.findFirst({
+    where: { source: "think" },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+  return latest?.createdAt ?? null;
 }
 
 export async function deleteUserInsight(

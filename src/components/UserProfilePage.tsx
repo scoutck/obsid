@@ -2,6 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 
+type SweepState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "thinking"; current: number; total: number; noteTitle: string }
+  | { status: "done"; processed: number }
+  | { status: "error"; message: string };
+
 interface Expertise {
   topic: string;
   strength: "deep" | "moderate" | "emerging";
@@ -44,6 +51,7 @@ export default function UserProfilePage({ onSelectNote, onBack }: UserProfilePag
   const [insights, setInsights] = useState<RawInsight[]>([]);
   const [loading, setLoading] = useState(true);
   const [synthesizing, setSynthesizing] = useState(false);
+  const [sweep, setSweep] = useState<SweepState>({ status: "idle" });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -66,6 +74,56 @@ export default function UserProfilePage({ onSelectNote, onBack }: UserProfilePag
       setSynthesizing(false);
     }
   }, []);
+
+  const runSweep = useCallback(async () => {
+    setSweep({ status: "loading" });
+
+    let pending;
+    try {
+      const res = await fetch("/api/ai/think-sweep/pending");
+      if (!res.ok) {
+        setSweep({ status: "error", message: "Failed to fetch pending notes" });
+        return;
+      }
+      pending = await res.json();
+    } catch {
+      setSweep({ status: "error", message: "Failed to fetch pending notes" });
+      return;
+    }
+
+    if (pending.total === 0) {
+      setSweep({ status: "done", processed: 0 });
+      return;
+    }
+
+    let processed = 0;
+    for (const note of pending.notes) {
+      setSweep({
+        status: "thinking",
+        current: processed + 1,
+        total: pending.total,
+        noteTitle: note.title || "Untitled",
+      });
+
+      try {
+        const res = await fetch("/api/ai/think", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ noteId: note.id }),
+        });
+        if (res.ok) {
+          processed++;
+        } else {
+          console.error(`[think-sweep] Server error for note ${note.id}: ${res.status}`);
+        }
+      } catch {
+        console.error(`[think-sweep] Failed to process note ${note.id}`);
+      }
+    }
+
+    setSweep({ status: "done", processed });
+    fetchData();
+  }, [fetchData]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -90,6 +148,58 @@ export default function UserProfilePage({ onSelectNote, onBack }: UserProfilePag
           <p className="text-sm text-zinc-500 mt-1">
             {insights.length} insight{insights.length !== 1 ? "s" : ""} collected
           </p>
+          <div className="mt-3">
+            {sweep.status === "idle" && (
+              <button
+                onClick={runSweep}
+                className="text-xs px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-700"
+              >
+                Think
+              </button>
+            )}
+            {sweep.status === "loading" && (
+              <p className="text-xs text-zinc-400">Finding notes to analyze...</p>
+            )}
+            {sweep.status === "thinking" && (
+              <div>
+                <p className="text-xs text-zinc-500">
+                  Thinking about &ldquo;{sweep.noteTitle}&rdquo;... {sweep.current} of {sweep.total}
+                </p>
+                <div className="mt-1 w-48 h-1 bg-zinc-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500 rounded-full transition-all duration-300"
+                    style={{ width: `${(sweep.current / sweep.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {sweep.status === "done" && (
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-zinc-500">
+                  {sweep.processed === 0
+                    ? "All caught up \u2014 no new notes since last think"
+                    : `Done \u2014 processed ${sweep.processed} note${sweep.processed !== 1 ? "s" : ""}`}
+                </p>
+                <button
+                  onClick={() => setSweep({ status: "idle" })}
+                  className="text-xs text-indigo-500 hover:text-indigo-700"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+            {sweep.status === "error" && (
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-red-500">{sweep.message}</p>
+                <button
+                  onClick={() => setSweep({ status: "idle" })}
+                  className="text-xs text-zinc-400 hover:text-zinc-600"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {insights.length === 0 ? (
