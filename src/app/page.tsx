@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import Editor from "@/components/Editor";
 import Toast from "@/components/Toast";
+import StatusBar from "@/components/StatusBar";
 import dynamic from "next/dynamic";
 
 const NoteSearchModal = dynamic(() => import("@/components/NoteSearchModal"));
@@ -46,6 +47,7 @@ export default function Home() {
   const [showAiPrompt, setShowAiPrompt] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [mode, setMode] = useState<"notes" | "chat">("notes");
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [showNewPerson, setShowNewPerson] = useState(false);
   const [newPersonPrefill, setNewPersonPrefill] = useState<string | undefined>();
@@ -434,6 +436,7 @@ export default function Home() {
   const handleChange = useCallback(
     (newContent: string) => {
       contentRef.current = newContent;
+      setSaveStatus("unsaved");
       if (!noteId) return;
 
       // Never overwrite a note with empty content — guard against edge-case
@@ -442,6 +445,7 @@ export default function Home() {
 
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(async () => {
+        setSaveStatus("saving");
         const titleMatch = newContent.match(/^#\s+(.+)$/m);
         const title = titleMatch
           ? titleMatch[1]
@@ -455,6 +459,7 @@ export default function Home() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title, content: newContent, links, tags }),
         });
+        setSaveStatus("saved");
       }, 500);
     },
     [noteId]
@@ -636,6 +641,12 @@ export default function Home() {
         <div className="flex items-center justify-center py-1">
           <span className="text-xs text-zinc-300">chat</span>
         </div>
+      )}
+      {mode === "notes" && noteId && (
+        <StatusBar
+          noteTitle={content.match(/^#\s+(.+)$/m)?.[1] || content.split("\n")[0]?.slice(0, 100) || "Untitled"}
+          saveStatus={saveStatus}
+        />
       )}
 
       <div className="flex-1 overflow-hidden">
