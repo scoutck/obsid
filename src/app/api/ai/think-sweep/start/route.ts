@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       custom_id: customId,
       params: {
         model: "claude-opus-4-6",
-        max_tokens: 4000,
+        max_tokens: 16000,
         system,
         messages,
         thinking: { type: "enabled", budget_tokens: 10000 },

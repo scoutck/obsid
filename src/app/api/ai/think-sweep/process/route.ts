@@ -40,7 +40,8 @@ export async function POST(request: NextRequest) {
     if (!item) continue;
 
     if (result.result.type !== "succeeded") {
-      console.error(`[think-sweep:process] Batch item ${result.custom_id} failed:`, result.result.type);
+      const errorDetail = result.result.type === "errored" ? (result.result as { type: string; error?: { type?: string; message?: string } }).error : undefined;
+      console.error(`[think-sweep:process] Batch item ${result.custom_id} failed:`, result.result.type, errorDetail ? JSON.stringify(errorDetail) : "");
       failed++;
       continue;
     }
