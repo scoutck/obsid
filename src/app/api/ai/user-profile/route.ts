@@ -20,13 +20,18 @@ export async function POST(request: NextRequest) {
   }
 
   const insightText = insights
-    .map((i) => `[${i.category}] ${i.content}${i.evidence ? ` (evidence: "${i.evidence}")` : ""}`)
+    .map((i) => `[${i.category}] (source: ${i.source ?? "organize"}) ${i.content}${i.evidence ? ` (evidence: "${i.evidence}")` : ""}`)
     .join("\n");
 
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
     max_tokens: 1024,
     system: `You synthesize user insights into a structured profile. You are analyzing observations collected from a user's personal knowledge base — things they've written that reveal who they are, how they think, and what they know.
+
+Insights come from three sources:
+- "organize": extracted automatically from note content
+- "think": discovered through deep cross-note analysis
+- "claude-desktop": observed in real-time during conversations with the user (often more candid and immediate)
 
 Return valid JSON only, no markdown wrapping. Use this format:
 {
