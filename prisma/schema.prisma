@@ -121,3 +121,30 @@ model UserInsight {
   @@index([sourceNoteId])
   @@index([source])
 }
+
+model NoteThinkTriage {
+  id        String   @id @default(uuid())
+  noteId    String   @unique
+  worthy    Boolean
+  reason    String   @default("")
+  triagedAt DateTime @default(now())
+
+  @@index([noteId])
+}
+
+model ThinkBatchItem {
+  id               String   @id @default(uuid())
+  batchId          String
+  noteId           String
+  customId         String
+  noteTitle        String   @default("")
+  noteContent      String   @default("")
+  explorationPlan  String   @default("{}")
+  explorerResults  String   @default("[]")
+  knownPeople      String   @default("[]")
+  status           String   @default("pending")
+  createdAt        DateTime @default(now())
+
+  @@index([batchId])
+  @@index([noteId])
+}

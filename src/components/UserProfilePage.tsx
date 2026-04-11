@@ -7,7 +7,10 @@ type SweepState =
   | { status: "loading" }
   | { status: "thinking"; current: number; total: number; noteTitle: string }
   | { status: "done"; processed: number }
-  | { status: "error"; message: string };
+  | { status: "error"; message: string }
+  | { status: "batch-submitted"; batchId: string; total: number }
+  | { status: "batch-checking"; batchId: string }
+  | { status: "batch-done"; processed: number; failed: number };
 
 interface Expertise {
   topic: string;
@@ -109,7 +112,7 @@ export default function UserProfilePage({ onSelectNote, onBack }: UserProfilePag
         const res = await fetch("/api/ai/think", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ noteId: note.id }),
+          body: JSON.stringify({ noteId: note.id, mode: "sweep" }),
         });
         if (res.ok) {
           processed++;
@@ -123,6 +126,62 @@ export default function UserProfilePage({ onSelectNote, onBack }: UserProfilePag
 
     setSweep({ status: "done", processed });
     fetchData();
+  }, [fetchData]);
+
+  const runBatchSweep = useCallback(async () => {
+    setSweep({ status: "loading" });
+
+    try {
+      const res = await fetch("/api/ai/think-sweep/start", { method: "POST" });
+      if (!res.ok) {
+        setSweep({ status: "error", message: "Failed to start batch sweep" });
+        return;
+      }
+      const data = await res.json();
+      if (!data.batchId) {
+        setSweep({ status: "done", processed: 0 });
+        return;
+      }
+      setSweep({ status: "batch-submitted", batchId: data.batchId, total: data.total });
+    } catch {
+      setSweep({ status: "error", message: "Failed to start batch sweep" });
+    }
+  }, []);
+
+  const checkBatchStatus = useCallback(async (batchId: string) => {
+    setSweep({ status: "batch-checking", batchId });
+
+    try {
+      const statusRes = await fetch(`/api/ai/think-sweep/status?batchId=${batchId}`);
+      if (!statusRes.ok) {
+        setSweep({ status: "error", message: "Failed to check batch status" });
+        return;
+      }
+      const statusData = await statusRes.json();
+
+      if (statusData.status !== "ended") {
+        setSweep({ status: "batch-submitted", batchId, total: statusData.counts?.processing ?? 0 });
+        return;
+      }
+
+      // Batch complete — process results
+      const processRes = await fetch("/api/ai/think-sweep/process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId }),
+      });
+
+      if (!processRes.ok) {
+        setSweep({ status: "error", message: "Failed to process batch results" });
+        return;
+      }
+
+      const processData = await processRes.json();
+      setSweep({ status: "batch-done", processed: processData.processed, failed: processData.failed });
+      fetchData();
+    } catch {
+      setSweep({ status: "error", message: "Failed to check batch status" });
+    }
   }, [fetchData]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -150,12 +209,20 @@ export default function UserProfilePage({ onSelectNote, onBack }: UserProfilePag
           </p>
           <div className="mt-3">
             {sweep.status === "idle" && (
-              <button
-                onClick={runSweep}
-                className="text-xs px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-700"
-              >
-                Think
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={runSweep}
+                  className="text-xs px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-700"
+                >
+                  Think now
+                </button>
+                <button
+                  onClick={runBatchSweep}
+                  className="text-xs px-3 py-1.5 rounded border border-zinc-300 text-zinc-600 hover:bg-zinc-50"
+                >
+                  Think later (batch)
+                </button>
+              </div>
             )}
             {sweep.status === "loading" && (
               <p className="text-xs text-zinc-400">Finding notes to analyze...</p>
@@ -194,6 +261,35 @@ export default function UserProfilePage({ onSelectNote, onBack }: UserProfilePag
                 <button
                   onClick={() => setSweep({ status: "idle" })}
                   className="text-xs text-zinc-400 hover:text-zinc-600"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+            {sweep.status === "batch-submitted" && (
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-zinc-500">
+                  Batch submitted &mdash; {sweep.total} note{sweep.total !== 1 ? "s" : ""} queued
+                </p>
+                <button
+                  onClick={() => checkBatchStatus(sweep.batchId)}
+                  className="text-xs text-indigo-500 hover:text-indigo-700"
+                >
+                  Check status
+                </button>
+              </div>
+            )}
+            {sweep.status === "batch-checking" && (
+              <p className="text-xs text-zinc-400">Checking batch status...</p>
+            )}
+            {sweep.status === "batch-done" && (
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-zinc-500">
+                  Batch complete &mdash; {sweep.processed} processed{sweep.failed > 0 ? `, ${sweep.failed} failed` : ""}
+                </p>
+                <button
+                  onClick={() => setSweep({ status: "idle" })}
+                  className="text-xs text-indigo-500 hover:text-indigo-700"
                 >
                   Dismiss
                 </button>
