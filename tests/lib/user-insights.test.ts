@@ -96,6 +96,23 @@ describe("deleteUserInsight", () => {
   });
 });
 
+describe("createUserInsight relationship category", () => {
+  beforeEach(async () => {
+    await prisma.userInsight.deleteMany();
+  });
+
+  it("accepts relationship category", async () => {
+    const insight = await createUserInsight({
+      category: "relationship",
+      content: "Values directness in close friendships",
+      evidence: "I just told her exactly what I thought",
+      source: "claude-desktop",
+    });
+    expect(insight.category).toBe("relationship");
+    expect(insight.source).toBe("claude-desktop");
+  });
+});
+
 describe("getLastThinkAt", () => {
   it("returns null when no think insights exist", async () => {
     const result = await getLastThinkAt();

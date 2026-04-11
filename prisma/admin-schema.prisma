@@ -23,3 +23,12 @@ model InviteCode {
   createdAt DateTime  @default(now())
   usedAt    DateTime?
 }
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  key        String    @unique
+  userId     String
+  name       String    @default("")
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+}

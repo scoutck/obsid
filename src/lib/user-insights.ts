@@ -10,7 +10,7 @@ interface CreateUserInsightInput {
   source?: string;
 }
 
-const VALID_CATEGORIES = ["self-reflection", "expertise", "behavior", "thinking-pattern"];
+const VALID_CATEGORIES = ["self-reflection", "expertise", "behavior", "thinking-pattern", "relationship"];
 
 export async function createUserInsight(
   input: CreateUserInsightInput,
