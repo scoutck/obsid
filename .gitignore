@@ -48,3 +48,7 @@ next-env.d.ts
 
 # superpowers
 .superpowers/
+
+# mcp server
+mcp/node_modules/
+mcp/dist/
