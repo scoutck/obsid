@@ -4,6 +4,8 @@ import { getLastThinkAt } from "@/lib/user-insights";
 import { triageNote, upsertTriage, getTriagesForNotes } from "@/lib/think-triage";
 import { runThinkExploration } from "@/lib/think-pipeline";
 import { buildSynthesisMessages } from "@/lib/think-synthesizer";
+import { loadEmbeddingCache } from "@/lib/embeddings";
+import { listPeople } from "@/lib/people";
 import Anthropic from "@anthropic-ai/sdk";
 
 export async function POST(request: NextRequest) {
@@ -58,11 +60,15 @@ export async function POST(request: NextRequest) {
   }
 
   // 3. Run stages 1-3 for all notes and store intermediate results
+  // Load shared resources once for all notes
+  const embeddingCache = await loadEmbeddingCache(db);
+  const knownPeople = (await listPeople(db)).map((p) => p.note.title);
+
   const batchId = crypto.randomUUID();
   const batchRequests: Anthropic.Beta.Messages.BatchCreateParams.Request[] = [];
 
   for (const note of toProcess) {
-    const exploration = await runThinkExploration(note.id, db, cookie);
+    const exploration = await runThinkExploration(note.id, db, cookie, { embeddingCache, knownPeople });
     if (!exploration) continue;
 
     const customId = `think-${note.id}`;
@@ -106,19 +112,26 @@ export async function POST(request: NextRequest) {
   }
 
   // 4. Submit batch
-  const batch = await anthropic.beta.messages.batches.create({
-    requests: batchRequests,
-  });
+  try {
+    const batch = await anthropic.beta.messages.batches.create({
+      requests: batchRequests,
+    });
 
-  // Update all items with the real Anthropic batch ID
-  await db.thinkBatchItem.updateMany({
-    where: { batchId },
-    data: { batchId: batch.id },
-  });
+    // Update all items with the real Anthropic batch ID
+    await db.thinkBatchItem.updateMany({
+      where: { batchId },
+      data: { batchId: batch.id },
+    });
 
-  return Response.json({
-    batchId: batch.id,
-    total: batchRequests.length,
-    message: `Batch submitted — ${batchRequests.length} notes queued`,
-  });
+    return Response.json({
+      batchId: batch.id,
+      total: batchRequests.length,
+      message: `Batch submitted — ${batchRequests.length} notes queued`,
+    });
+  } catch (err) {
+    // Clean up orphaned batch items
+    await db.thinkBatchItem.deleteMany({ where: { batchId } });
+    console.error("[think-sweep:start] Batch submission failed:", err);
+    return Response.json({ error: "Failed to submit batch" }, { status: 502 });
+  }
 }

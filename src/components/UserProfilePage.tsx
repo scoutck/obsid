@@ -112,7 +112,7 @@ export default function UserProfilePage({ onSelectNote, onBack }: UserProfilePag
         const res = await fetch("/api/ai/think", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ noteId: note.id }),
+          body: JSON.stringify({ noteId: note.id, mode: "sweep" }),
         });
         if (res.ok) {
           processed++;

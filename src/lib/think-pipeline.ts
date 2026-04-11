@@ -3,7 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import { getNote, conditionalUpdateNote, updateNote } from "@/lib/notes";
 import { getPersonByAlias, addNotePerson } from "@/lib/people";
 import { listPeople } from "@/lib/people";
-import { loadEmbeddingCache, embedNote } from "@/lib/embeddings";
+import { loadEmbeddingCache, embedNote, type EmbeddingCache } from "@/lib/embeddings";
 import { createUserInsights } from "@/lib/user-insights";
 import { extractInlineTags } from "@/lib/tags";
 import { triageNote, upsertTriage, getTriageForNote } from "@/lib/think-triage";
@@ -239,7 +239,8 @@ export async function runThinkPipeline(
 export async function runThinkExploration(
   noteId: string,
   db: PrismaClient,
-  cookie: string
+  cookie: string,
+  shared?: { embeddingCache?: EmbeddingCache; knownPeople?: string[] }
 ): Promise<{
   noteTitle: string;
   noteContent: string;
@@ -251,7 +252,7 @@ export async function runThinkExploration(
   if (!note) return null;
 
   const plan = await planExploration(note.title, note.content);
-  const embeddingCache = await loadEmbeddingCache(db);
+  const embeddingCache = shared?.embeddingCache ?? await loadEmbeddingCache(db);
   const explorerResults = await runAllExplorers(
     noteId,
     note.title,
@@ -260,8 +261,7 @@ export async function runThinkExploration(
     { embeddingCache, cookie },
     db
   );
-  const people = await listPeople(db);
-  const knownPeople = people.map((p) => p.note.title);
+  const knownPeople = shared?.knownPeople ?? (await listPeople(db)).map((p) => p.note.title);
 
   return { noteTitle: note.title, noteContent: note.content, plan, explorerResults, knownPeople };
 }
