@@ -4,6 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
+## Workflow
+
+**UI/UX changes require the `frontend-design` skill.** Before implementing any visual changes — new components, redesigns, style updates — invoke `/frontend-design` to evaluate design quality and establish direction. Use it for both critiques and creation.
+
+**PR merge flow: implement → code-review → fix → re-review → merge.** After pushing a feature branch, run `/code-review` on the PR. Fix any issues found, push, and re-run `/code-review`. Repeat until the review passes clean. Only merge after a clean review.
+
 ## Commands
 
 ```bash
@@ -129,6 +135,10 @@ Vitest with `fileParallelism: false` (SQLite concurrency). `tests/setup.ts` crea
 
 `page.tsx` uses a `contentRef` (not `content` state) for the auto-save callback to avoid re-rendering the entire component tree on every keystroke. The Editor's `useEffect` has `[]` deps — it creates the CodeMirror instance once. Note switching uses `key={noteId}` to force a full remount.
 
+### Fonts
+
+Three fonts loaded via `next/font/google` in `layout.tsx`: Newsreader (serif, `--font-body`) for editor/reading text, DM Sans (`--font-ui`) for interface chrome, JetBrains Mono (`--font-mono`) for code. The serif body font is an intentional brand choice — don't replace it with a sans-serif.
+
 ## Gotchas
 
 - **Never add `initialContent` to the Editor useEffect deps.** The editor creates once on mount (`[]` deps) and uses `initialContentRef`. Note switching remounts via `key={noteId}`. Adding content to deps destroys/recreates CodeMirror on every keystroke.
@@ -172,3 +182,7 @@ Vitest with `fileParallelism: false` (SQLite concurrency). `tests/setup.ts` crea
 - **Toast duration must be extended for long-running operations.** The default 3s auto-dismiss is too short for `/think` (10-30s). Pass a longer `duration` prop and reset to 3000 when the operation completes.
 - **Remote migration required after every schema change.** Run `set -a && source .env.local && set +a && npx tsx scripts/migrate-all-user-dbs.ts` after deploying schema changes. This is easy to forget and causes immediate production crashes.
 - **Think sweep re-processes notes it modified.** When `/think` appends connections, it bumps `updatedAt`. The next sweep sees that note as "changed." Acceptable for now — the insights accumulate, and re-analysis with new vault context can surface new patterns.
+- **New UI reading note content must not use `content` state.** `content` state freezes at load time — `handleChange` only updates `contentRef.current`. Add a separate state (e.g., `noteTitle`) updated during the debounced save, or derive from `contentRef`. Never pass `content` to components that should reflect live edits.
+- **Slash menu height is defined in two places.** `SlashMenu.tsx` has the CSS `max-h-[360px]` class, and `Editor.tsx` has `menuHeight = 360` for the viewport-flip calculation. Both must stay in sync when changing menu height.
+- **Clear `saveTimeoutRef` in `loadNote`.** `loadNote` clears `organizeTimeoutRef` but must also clear `saveTimeoutRef` — a pending debounced save from the previous note can fire after navigation and corrupt the new note's `saveStatus`.
+- **Design system tokens are in `globals.css` `:root`.** See `docs/BRAND.md` for the full brand guidelines. Use CSS variables (`var(--text-body)`, `var(--accent)`, etc.) — never hardcode hex colors that have a corresponding token.
