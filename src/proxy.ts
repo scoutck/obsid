@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { adminPrisma } from "@/lib/admin-db";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/api/auth/"];
+const PUBLIC_PATHS = ["/login", "/signup", "/api/auth/", "/api/mcp/"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname.startsWith(p));
