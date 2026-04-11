@@ -51,6 +51,10 @@ export async function DELETE(
     data: { personNoteId: null },
   });
   await db.userInsight.deleteMany({ where: { sourceNoteId: id } });
+  // Clean up think triage
+  await db.noteThinkTriage.deleteMany({ where: { noteId: id } });
+  // Clean up batch items
+  await db.thinkBatchItem.deleteMany({ where: { noteId: id } });
   await deleteNote(id, db);
   return NextResponse.json({ success: true });
 }

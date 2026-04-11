@@ -10,6 +10,7 @@ import { createNote } from "@/lib/notes";
 import { prisma } from "@/lib/db";
 
 beforeEach(async () => {
+  await prisma.thinkBatchItem.deleteMany();
   await prisma.noteThinkTriage.deleteMany();
   await prisma.note.deleteMany();
 });
