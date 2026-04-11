@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import Editor from "@/components/Editor";
 import Toast from "@/components/Toast";
+import StatusBar from "@/components/StatusBar";
 import dynamic from "next/dynamic";
 
 const NoteSearchModal = dynamic(() => import("@/components/NoteSearchModal"));
@@ -46,6 +47,8 @@ export default function Home() {
   const [showAiPrompt, setShowAiPrompt] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [mode, setMode] = useState<"notes" | "chat">("notes");
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
+  const [noteTitle, setNoteTitle] = useState("Untitled");
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [showNewPerson, setShowNewPerson] = useState(false);
   const [newPersonPrefill, setNewPersonPrefill] = useState<string | undefined>();
@@ -79,6 +82,7 @@ export default function Home() {
         setContent(latest.content);
         contentRef.current = latest.content;
         setNoteTags(latest.tags || []);
+        setNoteTitle(latest.title || latest.content.split("\n")[0]?.slice(0, 100) || "Untitled");
         return;
       }
 
@@ -95,6 +99,7 @@ export default function Home() {
       const note = await res.json();
       setNoteId(note.id);
       setContent(note.content);
+      setNoteTitle(note.title || "Untitled");
       contentRef.current = note.content;
     }
     init();
@@ -156,6 +161,8 @@ export default function Home() {
       contentRef.current = note.content;
       setNoteTags(note.tags || []);
       setNoteCommands(cmds);
+      setSaveStatus("saved");
+      setNoteTitle(note.title || note.content.split("\n")[0]?.slice(0, 100) || "Untitled");
 
       // Track recent siblings
       recentSiblingsRef.current = [
@@ -434,6 +441,7 @@ export default function Home() {
   const handleChange = useCallback(
     (newContent: string) => {
       contentRef.current = newContent;
+      setSaveStatus("unsaved");
       if (!noteId) return;
 
       // Never overwrite a note with empty content — guard against edge-case
@@ -442,19 +450,26 @@ export default function Home() {
 
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(async () => {
+        setSaveStatus("saving");
         const titleMatch = newContent.match(/^#\s+(.+)$/m);
         const title = titleMatch
           ? titleMatch[1]
           : newContent.split("\n")[0]?.slice(0, 100) || "";
+        setNoteTitle(title || "Untitled");
 
         const links = extractWikiLinks(newContent);
         const tags = extractInlineTags(newContent);
 
-        await fetch(`/api/notes/${noteId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, content: newContent, links, tags }),
-        });
+        try {
+          const res = await fetch(`/api/notes/${noteId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title, content: newContent, links, tags }),
+          });
+          setSaveStatus(res.ok ? "saved" : "unsaved");
+        } catch {
+          setSaveStatus("unsaved");
+        }
       }, 500);
     },
     [noteId]
@@ -636,6 +651,12 @@ export default function Home() {
         <div className="flex items-center justify-center py-1">
           <span className="text-xs text-zinc-300">chat</span>
         </div>
+      )}
+      {mode === "notes" && noteId && (
+        <StatusBar
+          noteTitle={noteTitle}
+          saveStatus={saveStatus}
+        />
       )}
 
       <div className="flex-1 overflow-hidden">

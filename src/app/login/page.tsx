@@ -32,12 +32,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-950">
+    <div className="min-h-screen flex items-center justify-center bg-zinc-900">
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-sm space-y-4 p-8"
       >
-        <h1 className="text-2xl font-bold text-neutral-100">Obsid</h1>
+        <h1 className="text-2xl font-bold text-zinc-50 font-[var(--font-body)]">Obsid</h1>
         {error && (
           <p className="text-red-400 text-sm">{error}</p>
         )}
@@ -46,7 +46,7 @@ export default function LoginPage() {
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-neutral-100 focus:outline-none focus:border-neutral-500"
+          className="w-full px-3 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-50 placeholder-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors duration-[120ms]"
           autoFocus
         />
         <input
@@ -54,18 +54,18 @@ export default function LoginPage() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-neutral-100 focus:outline-none focus:border-neutral-500"
+          className="w-full px-3 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-50 placeholder-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors duration-[120ms]"
         />
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2 bg-neutral-100 text-neutral-900 rounded font-medium hover:bg-neutral-200 disabled:opacity-50"
+          className="w-full py-2.5 bg-zinc-50 text-zinc-900 rounded-lg font-medium hover:bg-zinc-200 disabled:opacity-50 transition-colors duration-[120ms]"
         >
           {loading ? "Logging in..." : "Log in"}
         </button>
-        <p className="text-neutral-500 text-sm text-center">
+        <p className="text-zinc-500 text-sm text-center">
           Have an invite code?{" "}
-          <a href="/signup" className="text-neutral-300 hover:underline">
+          <a href="/signup" className="text-zinc-400 hover:text-zinc-200 transition-colors duration-[120ms]">
             Sign up
           </a>
         </p>

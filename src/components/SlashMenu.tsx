@@ -2,6 +2,16 @@
 
 import { useState, useEffect, useRef } from "react";
 import { filterCommands, type SlashCommand } from "@/editor/slash-commands";
+import * as icons from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+const iconMap = icons as unknown as Record<string, LucideIcon>;
+
+function CommandIcon({ name }: { name: string }) {
+  const Icon = iconMap[name];
+  if (!Icon) return null;
+  return <Icon size={16} strokeWidth={1.75} className="text-zinc-400 shrink-0" />;
+}
 
 interface SlashMenuProps {
   query: string;
@@ -50,7 +60,7 @@ export default function SlashMenu({
   }, [filtered, selectedIndex, onSelect, onClose]);
 
   useEffect(() => {
-    const el = menuRef.current?.children[selectedIndex] as HTMLElement;
+    const el = menuRef.current?.querySelector(`[data-index="${selectedIndex}"]`) as HTMLElement;
     el?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
@@ -61,7 +71,7 @@ export default function SlashMenu({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 bg-white border border-zinc-200 rounded-lg shadow-lg py-1 w-64 max-h-72 overflow-y-auto"
+      className="fixed z-50 bg-white border border-zinc-200 rounded-[10px] shadow-lg py-1 w-[280px] max-h-[360px] overflow-y-auto animate-[menu-in_150ms_ease-out]"
       style={{ top: position.top, left: position.left }}
     >
       {filtered.map((cmd, i) => {
@@ -70,19 +80,21 @@ export default function SlashMenu({
         return (
           <div key={cmd.action}>
             {showCategory && (
-              <div className="px-3 py-1 text-xs text-zinc-500 font-medium uppercase tracking-wide">
+              <div className="px-3 py-1.5 text-[11px] text-zinc-400 font-semibold uppercase tracking-wider mt-1 first:mt-0">
                 {cmd.category}
               </div>
             )}
             <button
-              className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-zinc-100 ${
-                i === selectedIndex ? "bg-zinc-100" : ""
+              data-index={i}
+              className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 hover:bg-[var(--bg-subtle)] transition-colors duration-[120ms] ${
+                i === selectedIndex ? "bg-[var(--bg-subtle)]" : ""
               }`}
               onMouseEnter={() => setSelectedIndex(i)}
               onClick={() => onSelect(cmd)}
             >
-              <span className="text-sm text-zinc-800">{cmd.label}</span>
-              <span className="text-xs text-zinc-500">{cmd.description}</span>
+              <CommandIcon name={cmd.icon} />
+              <span className="text-sm text-zinc-800 flex-1">{cmd.label}</span>
+              <span className="text-xs text-zinc-400">{cmd.description}</span>
             </button>
           </div>
         );

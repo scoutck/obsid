@@ -107,46 +107,55 @@ export default function ChatView({ conversation, onSlashCommand }: ChatViewProps
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-[720px] mx-auto space-y-4">
           {messages.length === 0 && (
-            <div className="text-center text-zinc-400 text-sm py-12">
+            <div className="text-center text-zinc-400 text-sm py-12 font-[var(--font-body)]">
               Start typing to chat with Claude about your notes.
             </div>
           )}
           {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`${
-                msg.role === "user"
-                  ? "text-zinc-900"
-                  : "text-zinc-700"
-              }`}
-            >
-              <div className="text-xs text-zinc-400 mb-1">
+            <div key={msg.id}>
+              <div className={`text-xs mb-1 ${
+                msg.role === "user" ? "text-zinc-400" : "text-[var(--ai-label)]"
+              }`}>
                 {msg.role === "user" ? "You" : "Claude"}
               </div>
-              <div className="text-sm whitespace-pre-wrap leading-relaxed">
+              <div className={`text-sm whitespace-pre-wrap leading-relaxed font-[var(--font-body)] ${
+                msg.role === "user"
+                  ? "text-zinc-900"
+                  : "text-zinc-700 bg-[var(--ai-bg)] border border-[var(--ai-border)] rounded-lg px-3 py-2.5"
+              }`}>
                 {msg.content}
               </div>
             </div>
           ))}
           {isLoading && (
-            <div className="text-zinc-400 text-sm">Claude is thinking...</div>
+            <div>
+              <div className="text-xs text-[var(--ai-label)] mb-1">Claude</div>
+              <div className="text-sm text-zinc-400 bg-[var(--ai-bg)] border border-[var(--ai-border)] rounded-lg px-3 py-2.5 animate-pulse font-[var(--font-body)]">
+                Thinking...
+              </div>
+            </div>
           )}
           <div ref={messagesEndRef} />
         </div>
       </div>
 
       {/* Input */}
-      <div className="border-t border-zinc-100 px-4 py-3">
+      <div className="border-t border-zinc-200 px-4 py-3">
         <div className="max-w-[720px] mx-auto">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
-            rows={1}
-            className="w-full resize-none bg-transparent text-zinc-900 placeholder-zinc-400 outline-none text-sm leading-relaxed"
-          />
+          <div className="border border-zinc-200 rounded-lg bg-white focus-within:border-indigo-300 transition-colors duration-[120ms] px-4 py-3 flex items-end gap-2">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message..."
+              rows={1}
+              className="flex-1 resize-none bg-transparent text-zinc-900 placeholder-zinc-400 outline-none text-sm leading-relaxed font-[var(--font-body)]"
+            />
+            {input.trim() && (
+              <span className="text-xs text-zinc-400 shrink-0 pb-0.5">Enter to send</span>
+            )}
+          </div>
         </div>
       </div>
     </div>

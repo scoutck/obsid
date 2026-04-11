@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Task } from "@/types";
+import { X } from "lucide-react";
 
 interface TaskModalProps {
   onNavigateToNote: (noteId: string) => void;
@@ -98,9 +99,9 @@ export default function TaskModal({ onNavigateToNote, onClose }: TaskModalProps)
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 animate-[modal-overlay-in_200ms_ease-out]" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-xl bg-white shadow-xl border border-zinc-200"
+        className="w-full max-w-md rounded-xl bg-white shadow-xl border border-zinc-200 animate-[modal-content-in_250ms_ease-out]"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
@@ -108,9 +109,9 @@ export default function TaskModal({ onNavigateToNote, onClose }: TaskModalProps)
           <h2 className="font-semibold text-zinc-900">Tasks</h2>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-600 text-sm"
+            className="text-zinc-400 hover:text-zinc-600 transition-colors duration-[120ms] p-1 -m-1"
           >
-            Close
+            <X size={18} strokeWidth={1.75} />
           </button>
         </div>
 
@@ -175,7 +176,7 @@ export default function TaskModal({ onNavigateToNote, onClose }: TaskModalProps)
               {tasks.map((task) => (
                 <div
                   key={task.id}
-                  className={`flex items-start gap-2.5 px-4 py-2 hover:bg-zinc-50 ${
+                  className={`flex items-start gap-2.5 px-4 py-2 hover:bg-zinc-50 transition-colors duration-[120ms] ${
                     task.completed ? "opacity-40" : ""
                   }`}
                 >
@@ -202,7 +203,7 @@ export default function TaskModal({ onNavigateToNote, onClose }: TaskModalProps)
                             onNavigateToNote(task.noteId!);
                             onClose();
                           }}
-                          className="text-xs text-blue-400 hover:text-blue-600 truncate"
+                          className="text-xs text-indigo-500 hover:text-indigo-700 truncate transition-colors duration-[120ms]"
                         >
                           {noteNames[task.noteId]}
                         </button>

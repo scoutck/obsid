@@ -8,7 +8,14 @@ import {
 import { syntaxTree } from "@codemirror/language";
 import { Range } from "@codemirror/state";
 
-const headingStyle = Decoration.mark({ class: "cm-heading" });
+const headingStyles: Record<string, Decoration> = {
+  ATXHeading1: Decoration.mark({ class: "cm-heading cm-heading-1" }),
+  ATXHeading2: Decoration.mark({ class: "cm-heading cm-heading-2" }),
+  ATXHeading3: Decoration.mark({ class: "cm-heading cm-heading-3" }),
+  ATXHeading4: Decoration.mark({ class: "cm-heading cm-heading-4" }),
+  ATXHeading5: Decoration.mark({ class: "cm-heading cm-heading-5" }),
+  ATXHeading6: Decoration.mark({ class: "cm-heading cm-heading-6" }),
+};
 const boldStyle = Decoration.mark({ class: "cm-bold" });
 const italicStyle = Decoration.mark({ class: "cm-italic" });
 const strikethroughStyle = Decoration.mark({ class: "cm-strikethrough" });
@@ -107,16 +114,11 @@ export const markdownPreview = ViewPlugin.fromClass(
           }
 
           // Headings: # through ######
-          if (
-            node.name === "ATXHeading1" ||
-            node.name === "ATXHeading2" ||
-            node.name === "ATXHeading3" ||
-            node.name === "ATXHeading4" ||
-            node.name === "ATXHeading5" ||
-            node.name === "ATXHeading6"
-          ) {
+          if (node.name.startsWith("ATXHeading")) {
+            const style = headingStyles[node.name];
+            if (!style) return;
             if (active) {
-              decorations.push(headingStyle.range(node.from, node.to));
+              decorations.push(style.range(node.from, node.to));
             } else {
               const line = view.state.doc.lineAt(node.from);
               const hashMatch = line.text.match(/^(#{1,6})\s/);
@@ -124,10 +126,10 @@ export const markdownPreview = ViewPlugin.fromClass(
                 const markerEnd = node.from + hashMatch[0].length;
                 decorations.push(hideMarker.range(node.from, markerEnd));
                 if (markerEnd < node.to) {
-                  decorations.push(headingStyle.range(markerEnd, node.to));
+                  decorations.push(style.range(markerEnd, node.to));
                 }
               } else {
-                decorations.push(headingStyle.range(node.from, node.to));
+                decorations.push(style.range(node.from, node.to));
               }
             }
           }

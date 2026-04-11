@@ -19,7 +19,7 @@ export default function Toast({
   }, [onDismiss, duration]);
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 px-4 py-2 rounded-lg bg-zinc-800 text-zinc-100 text-sm shadow-lg">
+    <div className="fixed bottom-5 right-5 z-50 px-4 py-2 rounded-[10px] bg-zinc-800 text-zinc-100 text-sm shadow-lg animate-[toast-in_200ms_ease-out]">
       {message}
     </div>
   );
