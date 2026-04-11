@@ -52,10 +52,10 @@ const theme = EditorView.theme({
   },
   ".cm-heading-1": { fontSize: "1.5em" },
   ".cm-heading-2": { fontSize: "1.25em" },
-  ".cm-heading-3": { fontWeight: "600", fontSize: "1.125em", color: "#27272a" },
-  ".cm-heading-4": { fontWeight: "600", fontSize: "1em", color: "#27272a" },
-  ".cm-heading-5": { fontWeight: "600", fontSize: "0.875em", color: "#3f3f46" },
-  ".cm-heading-6": { fontWeight: "600", fontSize: "0.875em", color: "#3f3f46", fontStyle: "italic" },
+  ".cm-heading-3": { fontWeight: "600", fontSize: "1.125em", color: "var(--text-body)" },
+  ".cm-heading-4": { fontWeight: "600", fontSize: "1em", color: "var(--text-body)" },
+  ".cm-heading-5": { fontWeight: "600", fontSize: "0.875em", color: "var(--text-secondary)" },
+  ".cm-heading-6": { fontWeight: "600", fontSize: "0.875em", color: "var(--text-secondary)", fontStyle: "italic" },
   ".cm-bold": {
     fontWeight: "700",
   },
@@ -287,7 +287,7 @@ export default function Editor({ initialContent = "", initialCommands, onChange,
               const coords = update.view.coordsAtPos(slashPos);
 
               if (coords) {
-                const menuHeight = 288; // max-h-72
+                const menuHeight = 360; // max-h-[360px]
                 const spaceBelow = window.innerHeight - coords.bottom;
                 const top = spaceBelow < menuHeight
                   ? coords.top - menuHeight - 4

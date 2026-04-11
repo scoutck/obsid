@@ -48,6 +48,7 @@ export default function Home() {
   const [toast, setToast] = useState<string | null>(null);
   const [mode, setMode] = useState<"notes" | "chat">("notes");
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
+  const [noteTitle, setNoteTitle] = useState("Untitled");
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [showNewPerson, setShowNewPerson] = useState(false);
   const [newPersonPrefill, setNewPersonPrefill] = useState<string | undefined>();
@@ -81,6 +82,7 @@ export default function Home() {
         setContent(latest.content);
         contentRef.current = latest.content;
         setNoteTags(latest.tags || []);
+        setNoteTitle(latest.title || latest.content.split("\n")[0]?.slice(0, 100) || "Untitled");
         return;
       }
 
@@ -97,6 +99,7 @@ export default function Home() {
       const note = await res.json();
       setNoteId(note.id);
       setContent(note.content);
+      setNoteTitle(note.title || "Untitled");
       contentRef.current = note.content;
     }
     init();
@@ -159,6 +162,7 @@ export default function Home() {
       setNoteTags(note.tags || []);
       setNoteCommands(cmds);
       setSaveStatus("saved");
+      setNoteTitle(note.title || note.content.split("\n")[0]?.slice(0, 100) || "Untitled");
 
       // Track recent siblings
       recentSiblingsRef.current = [
@@ -451,6 +455,7 @@ export default function Home() {
         const title = titleMatch
           ? titleMatch[1]
           : newContent.split("\n")[0]?.slice(0, 100) || "";
+        setNoteTitle(title || "Untitled");
 
         const links = extractWikiLinks(newContent);
         const tags = extractInlineTags(newContent);
@@ -649,7 +654,7 @@ export default function Home() {
       )}
       {mode === "notes" && noteId && (
         <StatusBar
-          noteTitle={content.match(/^#\s+(.+)$/m)?.[1] || content.split("\n")[0]?.slice(0, 100) || "Untitled"}
+          noteTitle={noteTitle}
           saveStatus={saveStatus}
         />
       )}
