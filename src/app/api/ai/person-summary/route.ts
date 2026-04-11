@@ -6,18 +6,7 @@ import { getPerson, getNotesMentioning, updatePersonSummary } from "@/lib/people
 const anthropic = new Anthropic();
 
 export async function POST(request: NextRequest) {
-  let db;
-  const hasProxyHeaders = request.headers.get("x-user-db-url");
-  if (hasProxyHeaders || process.env.NODE_ENV !== "production") {
-    db = getDb(request);
-  } else {
-    const { validateApiKey } = await import("@/lib/mcp-auth");
-    const auth = await validateApiKey(request);
-    if (!auth) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    db = auth.db;
-  }
+  const db = getDb(request);
   const { personNoteId } = await request.json();
 
   const person = await getPerson(personNoteId, db);
