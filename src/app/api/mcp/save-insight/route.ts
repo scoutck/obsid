@@ -36,11 +36,12 @@ export async function POST(request: NextRequest) {
     auth.db
   );
 
-  // Handle person linking if provided
+  // Handle person detection if provided
+  // Note: standalone insights can't link via NotePerson (requires noteId).
+  // Known people are acknowledged; unknown people become PendingPerson for review.
   if (personName) {
     const person = await getPersonByAlias(personName, auth.db);
     if (!person) {
-      // Create PendingPerson for review
       await createPendingPerson(
         {
           name: personName,

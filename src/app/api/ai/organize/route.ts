@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
     db = auth.db;
   }
   const cookieHeader = request.headers.get("cookie") ?? "";
+  const authHeader = request.headers.get("authorization") ?? "";
   const { noteId, recentSiblingIds } = await request.json();
 
   // Fetch note and snapshot updatedAt for staleness detection
@@ -259,6 +260,7 @@ Return only the summary text, nothing else.`,
       headers: {
         "Content-Type": "application/json",
         ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+        ...(authHeader ? { Authorization: authHeader } : {}),
       },
       body: JSON.stringify({ personNoteId }),
     }).catch(() => {});
