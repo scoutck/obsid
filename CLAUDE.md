@@ -116,6 +116,16 @@ Person = Note with `type: "person"` + `PersonMeta` (aliases, role, summary, user
 
 `UserInsight` table stores raw AI-harvested observations about the user (category, content, evidence, sourceNoteId). The organize endpoint's prompt is extended to detect self-reflective writing and store insights automatically. `/me` slash command opens `UserProfilePage`, which fetches all insights and sends them to `/api/ai/user-profile` for on-demand synthesis into a structured profile (summary, expertise, patterns, thinking style). `src/lib/user-insights.ts` has CRUD.
 
+### MCP integration (Claude Desktop)
+
+`mcp/` is a standalone Node.js package (separate `package.json`, `tsconfig.json`) that Claude Desktop spawns via stdio. It exposes `save_to_vault` and `capture_insight` tools that call `/api/mcp/save-note` and `/api/mcp/save-insight` via HTTP with API key auth.
+
+**Auth flow:** API keys (`obsid_` prefix) stored in `ApiKey` table in admin DB. The proxy (`proxy.ts`) handles both JWT cookies (browser) and `Bearer obsid_...` API keys (MCP). When no JWT cookie is found, the proxy checks for an API key header, validates it, and injects the same `x-user-db-url`/`x-user-db-token` headers. Routes use `getDb(request)` regardless of auth method.
+
+`/api/mcp/*` routes are in `PUBLIC_PATHS` — they bypass the proxy and call `validateApiKey()` from `src/lib/mcp-auth.ts` directly. Internal fire-and-forget fetches from MCP routes (e.g., save-note → organize) forward the `Authorization` header so the proxy can authenticate them via `handleApiKeyAuth`.
+
+`scripts/generate-api-key.ts` creates keys. `UserInsight` has `source: "claude-desktop"` and supports a `"relationship"` category. Desktop notes have `type: "desktop"`.
+
 ### Tag system
 
 Tags are inline `#tag` text in note content — content is the source of truth. Tags are user-owned; the AI does not add or modify tags. `src/lib/extract-tags.ts` has the pure `extractInlineTags()` function (client-safe). `src/lib/tags.ts` re-exports it and adds `getTagVocabulary()` (server-only, uses Prisma). The `tags` DB field is a search cache populated on auto-save.
@@ -186,3 +196,9 @@ Three fonts loaded via `next/font/google` in `layout.tsx`: Newsreader (serif, `-
 - **Slash menu height is defined in two places.** `SlashMenu.tsx` has the CSS `max-h-[360px]` class, and `Editor.tsx` has `menuHeight = 360` for the viewport-flip calculation. Both must stay in sync when changing menu height.
 - **Clear `saveTimeoutRef` in `loadNote`.** `loadNote` clears `organizeTimeoutRef` but must also clear `saveTimeoutRef` — a pending debounced save from the previous note can fire after navigation and corrupt the new note's `saveStatus`.
 - **Design system tokens are in `globals.css` `:root`.** See `docs/BRAND.md` for the full brand guidelines. Use CSS variables (`var(--text-body)`, `var(--accent)`, etc.) — never hardcode hex colors that have a corresponding token.
+- **Never add internal routes to `PUBLIC_PATHS` to support API key auth.** The proxy skips header injection for public paths — browser requests to those routes lose their per-user DB routing and get 401s. Instead, the proxy's `handleApiKeyAuth` validates API keys and injects headers at the transport layer.
+- **`tsconfig.json` must exclude `mcp/`.** The root `include: ["**/*.ts"]` picks up `mcp/src/index.ts`, but `@modelcontextprotocol/sdk` types aren't available to the root project. Next.js build fails with "Cannot find module" errors.
+- **`vitest.config.ts` must exclude `mcp/**`.** Without this, vitest discovers test files inside `mcp/node_modules` (e.g., zod's internal tests) and runs them.
+- **`max_tokens` must exceed `thinking.budget_tokens`** in Anthropic API calls. The batch API rejects requests where `max_tokens < budget_tokens`. Set `max_tokens` to at least `budget_tokens + expected_output_tokens`.
+- **Fire-and-forget fetches must forward `Authorization` header alongside cookies.** MCP-triggered chains (save-note → organize → person-summary) have no cookie but carry an API key. Forward both: `...(cookieHeader ? { Cookie: cookieHeader } : {}), ...(authHeader ? { Authorization: authHeader } : {})`.
+- **Admin migrations are raw SQL, not Prisma migrations.** Files in `prisma/admin-migrations/` must be applied manually via the libsql client against the admin Turso DB. They are not auto-applied by `prisma migrate deploy`.
