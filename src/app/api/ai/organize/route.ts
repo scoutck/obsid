@@ -23,7 +23,20 @@ interface OrganizeResult {
 }
 
 export async function POST(request: NextRequest) {
-  const db = getDb(request);
+  let db;
+  // Try standard proxy-injected headers first, fall back to API key auth
+  const hasProxyHeaders = request.headers.get("x-user-db-url");
+  if (hasProxyHeaders || process.env.NODE_ENV !== "production") {
+    db = getDb(request);
+  } else {
+    // MCP route may trigger organize with API key auth
+    const { validateApiKey } = await import("@/lib/mcp-auth");
+    const auth = await validateApiKey(request);
+    if (!auth) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    db = auth.db;
+  }
   const cookieHeader = request.headers.get("cookie") ?? "";
   const { noteId, recentSiblingIds } = await request.json();
 
