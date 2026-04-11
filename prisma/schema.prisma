@@ -121,3 +121,13 @@ model UserInsight {
   @@index([sourceNoteId])
   @@index([source])
 }
+
+model NoteThinkTriage {
+  id        String   @id @default(uuid())
+  noteId    String   @unique
+  worthy    Boolean
+  reason    String   @default("")
+  triagedAt DateTime @default(now())
+
+  @@index([noteId])
+}
