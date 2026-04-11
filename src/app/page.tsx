@@ -158,6 +158,7 @@ export default function Home() {
       contentRef.current = note.content;
       setNoteTags(note.tags || []);
       setNoteCommands(cmds);
+      setSaveStatus("saved");
 
       // Track recent siblings
       recentSiblingsRef.current = [
@@ -454,12 +455,16 @@ export default function Home() {
         const links = extractWikiLinks(newContent);
         const tags = extractInlineTags(newContent);
 
-        await fetch(`/api/notes/${noteId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, content: newContent, links, tags }),
-        });
-        setSaveStatus("saved");
+        try {
+          const res = await fetch(`/api/notes/${noteId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title, content: newContent, links, tags }),
+          });
+          setSaveStatus(res.ok ? "saved" : "unsaved");
+        } catch {
+          setSaveStatus("unsaved");
+        }
       }, 500);
     },
     [noteId]
