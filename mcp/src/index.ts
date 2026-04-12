@@ -17,20 +17,28 @@ const server = new McpServer({
 
 server.tool(
   "save_to_vault",
-  `Save a distilled note to the user's personal knowledge base (Obsid). This vault captures the user's thinking across ALL domains — work, relationships, hobbies, health, creative projects, decisions, observations about life.
+  `Save a note to the user's personal knowledge base (Obsid). This vault captures the user's thinking across ALL domains — work, relationships, hobbies, health, creative projects, decisions, observations about life.
+
+CRITICAL: Do NOT produce a clean reference document or organized summary. Capture HOW the user thinks, not just WHAT was discussed. The vault's AI systems extract patterns from the user's thinking process — a polished summary destroys that signal.
 
 When saving:
-- Write in the user's voice, not as a conversation summary
-- Preserve the user's actual words and phrases as much as possible — quote them naturally within the note
-- Distill structure (what was discussed, what was decided, what's unresolved) but keep the user's language as the substance
-- Don't editorialize or add conclusions the user didn't reach
-- Include names of people mentioned naturally`,
+- Tell the story of what the user explored, in their voice
+- Start with what sparked the conversation — what question or problem brought them here
+- Follow the thread of their curiosity — how each question led to the next
+- Quote the user's actual words at key moments: surprise ("what the fuck is that"), pushback ("i feel like that's wrong"), confusion ("why am i so confused"), realizations, decisions
+- Capture wrong assumptions that got corrected — "I thought X, turns out Y because Z"
+- Note when the user tested limits or made creative leaps — especially when they arrived at the right answer independently
+- Separate what clicked from what was just context — not everything matters equally
+- Preserve the user's learning/thinking style signals: did they ask for visuals? Push past surface explanations? Avoid formalism? Test ideas at their extremes?
+- Include names of people mentioned naturally
+- Do NOT reorganize the conversation into a textbook structure. The messy, honest progression is the point.
+- Do NOT editorialize or add conclusions the user didn't reach`,
   {
     title: z.string().describe("Concise, natural title for the note"),
     content: z
       .string()
       .describe(
-        "Markdown note content — distilled with structure but preserving the user's words"
+        "Markdown note — captures the user's thinking process, curiosity thread, and actual words, not a polished summary"
       ),
   },
   async ({ title, content }) => {
