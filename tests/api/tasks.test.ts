@@ -52,6 +52,23 @@ describe("GET /api/tasks", () => {
     expect(data).toHaveLength(1);
     expect(data[0].title).toBe("Buy groceries");
   });
+
+  it("includes noteTitle for linked tasks", async () => {
+    const note = await createNote({ title: "My Note" });
+    await createTask({ title: "Linked task", noteId: note.id });
+    await createTask({ title: "Standalone task" });
+
+    const { GET } = await import("@/app/api/tasks/route");
+    const request = new Request("http://localhost/api/tasks");
+    const response = await GET(request as unknown as NextRequest);
+    const data = await response.json();
+
+    const linked = data.find((t: { title: string }) => t.title === "Linked task");
+    const standalone = data.find((t: { title: string }) => t.title === "Standalone task");
+
+    expect(linked.noteTitle).toBe("My Note");
+    expect(standalone.noteTitle).toBeNull();
+  });
 });
 
 describe("POST /api/tasks", () => {
