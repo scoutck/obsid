@@ -82,6 +82,47 @@ body {
   margin: 1em 0;
 }
 
+/* Task checkboxes in editor */
+.cm-task-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+.cm-task-unchecked {
+  border: 1.5px solid var(--border-strong);
+  transition: border-color 120ms ease-in-out, background-color 120ms ease-in-out;
+}
+
+.cm-task-unchecked:hover {
+  border-color: var(--accent);
+  background-color: rgba(79, 70, 229, 0.06);
+}
+
+.cm-task-checked {
+  background-color: var(--accent);
+  border: 1.5px solid var(--accent);
+  color: white;
+}
+
+.cm-task-checked:hover {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.cm-task-completed {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-disabled);
+  color: var(--text-tertiary);
+}
+
 /* Wiki-link styling */
 .cm-wiki-link {
   color: var(--accent);

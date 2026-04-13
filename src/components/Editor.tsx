@@ -11,6 +11,7 @@ import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language"
 import { markdownPreview } from "@/editor/markdown-preview";
 import { wikiLinkDecorations } from "@/editor/wiki-links";
 import { tagSyntaxDecorations } from "@/editor/tag-syntax";
+import { taskCheckboxExtension } from "@/editor/task-checkboxes";
 import {
   commandWidgetsExtension,
   addCommandEffect,
@@ -238,6 +239,7 @@ export default function Editor({ initialContent = "", initialCommands, onChange,
         markdownPreview,
         wikiLinkDecorations,
         tagSyntaxDecorations,
+        taskCheckboxExtension,
         commandWidgetsExtension,
         theme,
         EditorView.lineWrapping,

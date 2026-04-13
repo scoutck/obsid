@@ -142,11 +142,18 @@ export default function Home() {
         organizeTimeoutRef.current = null;
       }
 
-      // Organize previous note in background with 2s debounce
+      // Organize previous note + sync inline tasks in background with 2s debounce
       if (noteId && noteId !== id) {
         const prevId = noteId;
+        const prevContent = contentRef.current;
         organizeTimeoutRef.current = setTimeout(() => {
           organizeNote(prevId);
+          // Sync inline checkbox tasks (- [ ] / - [x]) to Task records
+          fetch("/api/tasks/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ noteId: prevId, content: prevContent }),
+          }).catch(() => {});
         }, 2000);
       }
 
