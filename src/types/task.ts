@@ -9,6 +9,10 @@ export interface Task {
   updatedAt: Date;
 }
 
+export interface TaskWithNote extends Task {
+  noteTitle: string | null;
+}
+
 export function parseTask(raw: {
   id: string;
   title: string;

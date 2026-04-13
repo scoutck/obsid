@@ -187,4 +187,4 @@ export function parseUserInsight(raw: {
   };
 }
 
-export { type Task, parseTask } from "./task";
+export { type Task, type TaskWithNote, parseTask } from "./task";
