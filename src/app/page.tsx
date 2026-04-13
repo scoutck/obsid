@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import Editor from "@/components/Editor";
 import Toast from "@/components/Toast";
 import StatusBar from "@/components/StatusBar";
+import NoteTasks from "@/components/NoteTasks";
 import dynamic from "next/dynamic";
 
 const NoteSearchModal = dynamic(() => import("@/components/NoteSearchModal"));
@@ -20,8 +21,9 @@ const PersonPage = dynamic(() => import("@/components/PersonPage"), {
 });
 const NewPersonFlow = dynamic(() => import("@/components/NewPersonFlow"));
 const PendingPeopleModal = dynamic(() => import("@/components/PendingPeopleModal"));
-const TaskInput = dynamic(() => import("@/components/TaskInput"));
-const TaskModal = dynamic(() => import("@/components/TaskModal"));
+const TaskPage = dynamic(() => import("@/components/TaskPage"), {
+  loading: () => <div className="flex items-center justify-center h-full"><p className="text-zinc-500">Loading...</p></div>,
+});
 const UserProfilePage = dynamic(() => import("@/components/UserProfilePage"), {
   loading: () => <div className="flex items-center justify-center h-full"><p className="text-zinc-500">Loading...</p></div>,
 });
@@ -53,8 +55,8 @@ export default function Home() {
   const [showNewPerson, setShowNewPerson] = useState(false);
   const [newPersonPrefill, setNewPersonPrefill] = useState<string | undefined>();
   const [showPendingPeople, setShowPendingPeople] = useState(false);
-  const [showTaskInput, setShowTaskInput] = useState(false);
-  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showTaskPage, setShowTaskPage] = useState(false);
+  const [taskCreateTrigger, setTaskCreateTrigger] = useState(0);
   const [showProfile, setShowProfile] = useState(false);
   const [personPageId, setPersonPageId] = useState<string | null>(null);
   const [aiResponse, setAiResponse] = useState<{
@@ -387,12 +389,12 @@ export default function Home() {
       }
 
       if (command.action === "task:create") {
-        setShowTaskInput(true);
+        setTaskCreateTrigger((prev) => prev + 1);
         return;
       }
 
       if (command.action === "task:list") {
-        setShowTaskModal(true);
+        setShowTaskPage(true);
         return;
       }
 
@@ -419,22 +421,6 @@ export default function Home() {
       });
     },
     [noteId, noteTags]
-  );
-
-  const handleCreateTask = useCallback(
-    (title: string) => {
-      setShowTaskInput(false);
-      fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, noteId: noteId ?? undefined }),
-      })
-        .then((res) => {
-          setToast(res.ok ? "Task created" : "Failed to create task");
-        })
-        .catch(() => setToast("Failed to create task"));
-    },
-    [noteId]
   );
 
   // Auto-save with debounce
@@ -626,9 +612,9 @@ export default function Home() {
           window.location.href = "/login";
         });
       } else if (action === "task" || action === "task:create") {
-        setShowTaskInput(true);
+        setShowTaskPage(true);
       } else if (action === "tasks" || action === "task:list") {
-        setShowTaskModal(true);
+        setShowTaskPage(true);
       } else if (action === "me" || action === "profile:me") {
         setShowProfile(true);
       }
@@ -660,7 +646,15 @@ export default function Home() {
       )}
 
       <div className="flex-1 overflow-hidden">
-        {showProfile ? (
+        {showTaskPage ? (
+          <TaskPage
+            onSelectNote={(id) => {
+              setShowTaskPage(false);
+              loadNote(id);
+            }}
+            onBack={() => setShowTaskPage(false)}
+          />
+        ) : showProfile ? (
           <UserProfilePage
             onSelectNote={(id) => {
               setShowProfile(false);
@@ -683,17 +677,26 @@ export default function Home() {
             onSlashCommand={handleChatSlashCommand}
           />
         ) : (
-          <Editor
-            key={noteId ?? "empty"}
-            initialContent={contentRef.current}
-            initialCommands={noteCommands}
-            mode={mode}
-            onChange={handleChange}
-            onSlashCommand={handleSlashCommand}
-            onWikiLinkClick={handleWikiLinkClick}
-            onClaudeCommand={handleClaudeCommand}
-            editorViewRef={editorViewRef}
-          />
+          <div className="h-full flex flex-col">
+            <div className="flex-1 overflow-y-auto">
+              <Editor
+                key={noteId ?? "empty"}
+                initialContent={contentRef.current}
+                initialCommands={noteCommands}
+                mode={mode}
+                onChange={handleChange}
+                onSlashCommand={handleSlashCommand}
+                onWikiLinkClick={handleWikiLinkClick}
+                onClaudeCommand={handleClaudeCommand}
+                editorViewRef={editorViewRef}
+              />
+              {noteId && mode === "notes" && (
+                <div className="max-w-[720px] mx-auto w-full px-4 pb-8">
+                  <NoteTasks noteId={noteId} createTrigger={taskCreateTrigger} />
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
@@ -771,21 +774,6 @@ export default function Home() {
             setShowNewPerson(true);
           }}
           onClose={() => setShowPendingPeople(false)}
-        />
-      )}
-      {showTaskInput && (
-        <TaskInput
-          onSubmit={handleCreateTask}
-          onClose={() => setShowTaskInput(false)}
-        />
-      )}
-      {showTaskModal && (
-        <TaskModal
-          onNavigateToNote={(id) => {
-            setShowTaskModal(false);
-            loadNote(id);
-          }}
-          onClose={() => setShowTaskModal(false)}
         />
       )}
     </main>

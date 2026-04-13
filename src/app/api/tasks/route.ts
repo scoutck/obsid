@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { createTask, getTasks, getTasksForNote, getTasksForPerson, searchTasks } from "@/lib/tasks";
+import { getNotesByIds } from "@/lib/notes";
+import type { Task, TaskWithNote } from "@/types";
+
+function enrichTasks(tasks: Task[], noteTitleMap: Map<string, string>): TaskWithNote[] {
+  return tasks.map((t) => ({
+    ...t,
+    noteTitle: t.noteId ? noteTitleMap.get(t.noteId) ?? null : null,
+  }));
+}
 
 export async function GET(request: NextRequest) {
   const db = getDb(request);
@@ -9,21 +18,17 @@ export async function GET(request: NextRequest) {
   const personNoteId = searchParams.get("personNoteId");
   const q = searchParams.get("q");
 
-  if (q) {
-    const tasks = await searchTasks(q, db);
-    return NextResponse.json(tasks);
-  }
-  if (noteId) {
-    const tasks = await getTasksForNote(noteId, db);
-    return NextResponse.json(tasks);
-  }
-  if (personNoteId) {
-    const tasks = await getTasksForPerson(personNoteId, db);
-    return NextResponse.json(tasks);
-  }
+  let tasks: Task[];
+  if (q) tasks = await searchTasks(q, db);
+  else if (noteId) tasks = await getTasksForNote(noteId, db);
+  else if (personNoteId) tasks = await getTasksForPerson(personNoteId, db);
+  else tasks = await getTasks(db);
 
-  const tasks = await getTasks(db);
-  return NextResponse.json(tasks);
+  const noteIds = [...new Set(tasks.map((t) => t.noteId).filter(Boolean))] as string[];
+  const notes = await getNotesByIds(noteIds, db);
+  const noteTitleMap = new Map(notes.map((n) => [n.id, n.title]));
+
+  return NextResponse.json(enrichTasks(tasks, noteTitleMap));
 }
 
 export async function POST(request: NextRequest) {
